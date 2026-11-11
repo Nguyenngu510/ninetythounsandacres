@@ -1,0 +1,49 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  @apply bg-ink text-parchment font-body;
+  font-size: 18px;
+}
+
+canvas {
+  image-rendering: pixelated;
+}
+
+/* khung panel pixel */
+.pixel-border {
+  border: 3px solid #6e4c2c;
+  box-shadow: 0 4px 0 #150c04;
+}
+
+/* nút pixel dùng chung */
+.btn {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 10px;
+  padding: 8px 12px;
+  cursor: pointer;
+  user-select: none;
+  background: #2e6da4;
+  border: 2px solid #1d4d7a;
+  box-shadow: 0 3px 0 #123352;
+  color: #fff;
+}
+.btn:active { transform: translateY(2px); box-shadow: 0 1px 0 #123352; }
+.btn:disabled { background: #6b6b6b; border-color: #4a4a4a; box-shadow: 0 3px 0 #3a3a3a; cursor: not-allowed; }
+.btn-green { background: #4d8a2b; border-color: #2c5218; box-shadow: 0 3px 0 #2c5218; }
+.btn-red { background: #b0432e; border-color: #7d2c1c; box-shadow: 0 3px 0 #571c10; }
+.btn-gold { background: #a8821e; border-color: #7a5d10; box-shadow: 0 3px 0 #4d3a08; }
+
+/* hiệu ứng nền màn hình đăng nhập */
+@keyframes drift {
+  from { transform: translateX(-15vw); }
+  to { transform: translateX(115vw); }
+}
+.cloud { position: absolute; animation: drift linear infinite; }
+
+@keyframes flagwave {
+  0%, 100% { transform: skewY(0deg); }
+  50% { transform: skewY(6deg); }
+}
+.flag { animation: flagwave 1.2s ease-in-out infinite; transform-origin: left center; }

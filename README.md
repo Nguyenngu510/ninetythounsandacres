@@ -1,5 +1,7 @@
 # ⚔️ Chín Vạn Mẫu — Chiến Thuật Tam Quốc (Pixel Web Game)
 
+> 🧩 **Bản React + TypeScript module hoá (mới)** nằm trong thư mục [`app/`](app/) — 6 màn hình (Đăng nhập/Server, Nội trị, Bản đồ canvas pan-zoom + fog of war, Đội hình & auto-battle, Quân đội & Anh hùng, Liên minh), engine tách biệt sẵn sàng lên backend. Chạy: `cd app && npm install && npm run dev` — xem [app/README.md](app/README.md).
+
 Game web pixel chiến thuật lấy cảm hứng từ **Ninety Thousand Acres (Chín Vạn Mẫu)**: bắt đầu từ 1 mẫu đất, xây thành, tuyển quân, triệu võ tướng và **chinh phạt từng ô đất** trên bản đồ cho đến khi thống lĩnh 90.000 mẫu.
 
 Toàn bộ trong một file `index.html` — không cần cài đặt, không cần build.
