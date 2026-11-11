@@ -3,20 +3,22 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Vườn Chín Vạn Mẫu — Pixel Farm</title>
+<title>Chín Vạn Mẫu — Chiến Thuật Tam Quốc</title>
 <style>
   :root {
-    --panel: #5a3a22;
-    --panel-dark: #3d2513;
-    --panel-light: #7a5230;
+    --panel: #4a3220;
+    --panel-dark: #2e1e10;
+    --panel-light: #6e4c2c;
     --text: #ffe9c7;
     --gold: #ffd24a;
+    --red: #e04a3a;
     --green: #7ec850;
+    --blue: #5ab0e8;
   }
   * { margin: 0; padding: 0; box-sizing: border-box; }
   html, body {
     width: 100%; height: 100%;
-    background: #1a1208;
+    background: #140d06;
     font-family: 'Courier New', monospace;
     overflow: hidden;
     user-select: none;
@@ -25,176 +27,250 @@
   #wrap {
     position: relative;
     width: 100vw; height: 100vh;
-    display: flex; align-items: center; justify-content: center;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 8px;
+  }
+  #board {
+    position: relative;
   }
   canvas {
     image-rendering: pixelated;
     image-rendering: crisp-edges;
     cursor: pointer;
+    display: block;
+    border: 4px solid var(--panel-light);
+    box-shadow: 0 6px 0 #1a0f05;
   }
-  #hud {
-    position: absolute; top: 0; left: 0; right: 0;
-    display: flex; justify-content: space-between;
-    padding: 10px 14px;
-    pointer-events: none;
-    z-index: 5;
+  #resbar {
+    display: flex; gap: 10px; flex-wrap: wrap;
+    justify-content: center;
   }
-  .hud-box {
+  .res {
     background: var(--panel-dark);
-    border: 3px solid var(--panel-light);
-    box-shadow: 0 3px 0 #241505;
+    border: 2px solid var(--panel-light);
+    box-shadow: 0 3px 0 #1a0f05;
     color: var(--text);
-    padding: 6px 12px;
-    font-size: 15px;
-    font-weight: bold;
-    letter-spacing: 1px;
-    display: flex; gap: 16px; align-items: center;
+    padding: 5px 10px;
+    font-size: 13px; font-weight: bold;
+    white-space: nowrap;
   }
-  .hud-box span { white-space: nowrap; }
-  #toolbar {
-    position: absolute; bottom: 12px; left: 50%;
-    transform: translateX(-50%);
-    display: flex; gap: 8px;
-    z-index: 5;
+  .res small { color: #b99a6e; font-weight: normal; }
+  #bottombar {
+    display: flex; gap: 8px; align-items: center;
   }
-  .tool {
-    width: 58px; height: 58px;
+  .bigbtn {
+    font-family: inherit; font-weight: bold;
     background: var(--panel);
     border: 3px solid var(--panel-light);
-    box-shadow: 0 4px 0 #241505;
+    box-shadow: 0 4px 0 #1a0f05;
     color: var(--text);
-    font-family: inherit;
-    font-size: 11px;
-    font-weight: bold;
-    display: flex; flex-direction: column;
+    padding: 9px 16px;
+    cursor: pointer; font-size: 13px;
+    letter-spacing: 1px;
+  }
+  .bigbtn:hover { background: var(--panel-light); }
+  .bigbtn:active { transform: translateY(3px); box-shadow: 0 1px 0 #1a0f05; }
+  .bigbtn.primary { background: #8a2f22; border-color: #b04a35; }
+  .bigbtn.primary:hover { background: #a53a2a; }
+  .bigbtn:disabled { opacity: .5; cursor: not-allowed; }
+
+  #tileinfo {
+    position: absolute;
+    left: 8px; bottom: 8px;
+    background: rgba(30, 19, 8, .95);
+    border: 3px solid var(--panel-light);
+    box-shadow: 0 4px 0 #1a0f05;
+    color: var(--text);
+    padding: 10px 12px;
+    font-size: 12px;
+    min-width: 190px;
+    display: none;
+    z-index: 8;
+  }
+  #tileinfo h3 { font-size: 14px; color: var(--gold); margin-bottom: 4px; }
+  #tileinfo .row { display: flex; justify-content: space-between; gap: 12px; margin: 2px 0; }
+  #tileinfo button { margin-top: 8px; width: 100%; }
+
+  .overlay {
+    position: fixed; inset: 0;
+    background: rgba(8, 5, 2, .78);
+    display: none;
     align-items: center; justify-content: center;
-    gap: 2px; cursor: pointer;
-    transition: transform .05s;
+    z-index: 30;
   }
-  .tool .icon { font-size: 22px; line-height: 1; }
-  .tool:hover { background: var(--panel-light); }
-  .tool:active { transform: translateY(3px); box-shadow: 0 1px 0 #241505; }
-  .tool.active {
-    background: #2e5d1e;
-    border-color: var(--green);
-    outline: 2px solid var(--gold);
+  .overlay.open { display: flex; }
+  .panelbox {
+    background: var(--panel-dark);
+    border: 4px solid var(--panel-light);
+    box-shadow: 0 8px 0 #150c04;
+    padding: 16px;
+    width: min(600px, 94vw);
+    max-height: 88vh;
+    overflow: auto;
+    color: var(--text);
   }
-  .tool .cost { color: var(--gold); font-size: 10px; }
-  #shopBtn {
-    position: absolute; right: 14px; bottom: 12px;
-    z-index: 5;
+  .panelbox h2 {
+    text-align: center; color: var(--gold);
+    letter-spacing: 2px; font-size: 18px; margin-bottom: 12px;
   }
+  .build-row, .unit-row {
+    display: flex; align-items: center; gap: 10px;
+    background: var(--panel);
+    border: 2px solid var(--panel-light);
+    padding: 8px 10px; margin-bottom: 7px;
+  }
+  .build-row .em, .unit-row .em { font-size: 24px; width: 32px; text-align: center; }
+  .build-row .info, .unit-row .info { flex: 1; }
+  .build-row .info b, .unit-row .info b { font-size: 14px; display: block; }
+  .build-row .info small, .unit-row .info small { color: #d9b98a; font-size: 11px; }
+  .lvl-badge {
+    background: #241505; border: 1px solid var(--panel-light);
+    padding: 2px 7px; font-size: 12px; font-weight: bold; color: var(--gold);
+  }
+  .actbtn {
+    font-family: inherit; font-weight: bold;
+    background: var(--green); border: 2px solid #4d8a2b;
+    box-shadow: 0 3px 0 #2c5218; color: #fff;
+    padding: 7px 10px; cursor: pointer; font-size: 12px;
+    white-space: nowrap;
+  }
+  .actbtn:active { transform: translateY(2px); box-shadow: 0 1px 0 #2c5218; }
+  .actbtn:disabled { background: #6b6b6b; border-color: #4a4a4a; cursor: not-allowed; }
+  .actbtn.red { background: #b0432e; border-color: #7d2c1c; box-shadow: 0 3px 0 #571c10; }
+  .actbtn.blue { background: #2e6da4; border-color: #1d4d7a; box-shadow: 0 3px 0 #123352; }
+  .stepper { display: flex; align-items: center; gap: 6px; }
+  .stepper button {
+    font-family: inherit; font-weight: bold; width: 26px; height: 26px;
+    background: var(--panel-light); color: var(--text);
+    border: 2px solid #241505; cursor: pointer; font-size: 14px;
+  }
+  .stepper span { min-width: 34px; text-align: center; font-weight: bold; font-size: 14px; }
+  .closebtn {
+    display: block; margin: 10px auto 0;
+    font-family: inherit; font-weight: bold;
+    background: #b0432e; border: 2px solid #7d2c1c;
+    box-shadow: 0 3px 0 #571c10; color: #fff;
+    padding: 8px 24px; cursor: pointer; font-size: 13px;
+  }
+  #battleLog {
+    background: #1c1106; border: 2px solid var(--panel-light);
+    height: 150px; overflow-y: auto;
+    padding: 8px; font-size: 12px; line-height: 1.7;
+    margin: 10px 0;
+  }
+  #battleLog .r { color: #d9b98a; }
+  #battleLog .good { color: var(--green); }
+  #battleLog .bad { color: var(--red); }
+  #vsRow {
+    display: flex; justify-content: space-around;
+    text-align: center; margin-bottom: 6px;
+  }
+  #vsRow .side b { font-size: 15px; }
+  #vsRow .side div { font-size: 12px; color: #d9b98a; }
   #toasts {
-    position: absolute; top: 70px; left: 50%;
+    position: fixed; top: 12px; left: 50%;
     transform: translateX(-50%);
     display: flex; flex-direction: column;
     align-items: center; gap: 6px;
-    pointer-events: none; z-index: 9;
+    pointer-events: none; z-index: 50;
   }
   .toast {
-    background: rgba(30, 18, 6, .92);
+    background: rgba(30, 18, 6, .95);
     border: 2px solid var(--gold);
     color: var(--text);
     padding: 6px 14px;
-    font-size: 14px; font-weight: bold;
+    font-size: 13px; font-weight: bold;
     animation: pop .25s ease-out;
+    max-width: 90vw; text-align: center;
   }
   @keyframes pop {
     from { transform: scale(.6); opacity: 0; }
     to   { transform: scale(1); opacity: 1; }
   }
-  #shop {
-    position: absolute; inset: 0;
-    background: rgba(10, 6, 2, .7);
-    display: none;
-    align-items: center; justify-content: center;
-    z-index: 20;
+  #endScreen {
+    position: fixed; inset: 0; z-index: 60;
+    background: rgba(5, 3, 1, .9);
+    display: none; align-items: center; justify-content: center;
+    text-align: center; color: var(--text);
   }
-  #shop.open { display: flex; }
-  #shopPanel {
-    background: var(--panel-dark);
-    border: 4px solid var(--panel-light);
-    box-shadow: 0 8px 0 #241505;
-    padding: 18px;
-    width: min(560px, 92vw);
-    max-height: 86vh;
-    overflow: auto;
-    color: var(--text);
-  }
-  #shopPanel h2 {
-    text-align: center;
-    color: var(--gold);
-    letter-spacing: 2px;
-    margin-bottom: 14px;
-    font-size: 20px;
-  }
-  .shop-row {
-    display: flex; align-items: center; gap: 12px;
-    background: var(--panel);
-    border: 2px solid var(--panel-light);
-    padding: 8px 12px; margin-bottom: 8px;
-  }
-  .shop-row .emoji { font-size: 26px; }
-  .shop-row .info { flex: 1; }
-  .shop-row .info b { display: block; font-size: 15px; }
-  .shop-row .info small { color: #d9b98a; font-size: 11px; }
-  .shop-row button {
-    font-family: inherit; font-weight: bold;
-    background: var(--green);
-    border: 2px solid #4d8a2b;
-    box-shadow: 0 3px 0 #2c5218;
-    color: #fff;
-    padding: 8px 12px;
-    cursor: pointer;
-    font-size: 13px;
-    white-space: nowrap;
-  }
-  .shop-row button:active { transform: translateY(2px); box-shadow: 0 1px 0 #2c5218; }
-  .shop-row button:disabled { background: #777; border-color: #555; cursor: not-allowed; }
-  .shop-row button .price { color: #fff8d0; }
-  #closeShop {
-    display: block; margin: 12px auto 0;
-    font-family: inherit; font-weight: bold;
-    background: #b0432e;
-    border: 2px solid #7d2c1c;
-    box-shadow: 0 3px 0 #571c10;
-    color: #fff; padding: 8px 24px;
-    cursor: pointer; font-size: 14px;
-  }
-  #help {
-    position: absolute; left: 14px; bottom: 12px;
-    z-index: 5;
-  }
+  #endScreen.open { display: flex; }
+  #endScreen h1 { font-size: 30px; margin-bottom: 12px; }
+  #endScreen p { margin-bottom: 18px; font-size: 14px; }
 </style>
 </head>
 <body>
 <div id="wrap">
-  <canvas id="game" width="480" height="320"></canvas>
-
-  <div id="hud">
-    <div class="hud-box">
-      <span>🪙 <span id="coins">0</span></span>
-      <span>⚡ <span id="energy">100</span>/100</span>
-      <span>📅 Ngày <span id="day">1</span></span>
-    </div>
-    <div class="hud-box">
-      <span id="clock">☀️ 06:00</span>
-    </div>
+  <div id="resbar">
+    <span class="res">🌾 <span id="rCrop">0</span><small>/<span id="capCrop">0</span></small></span>
+    <span class="res">🪵 <span id="rWood">0</span><small>/<span id="capWood">0</span></small></span>
+    <span class="res">🪨 <span id="rStone">0</span><small>/<span id="capStone">0</span></small></span>
+    <span class="res">🪙 <span id="rGold">0</span></span>
+    <span class="res">⚔️ Lệnh <span id="rTokens">0</span><small>/<span id="maxTokens">5</span></small></span>
+    <span class="res">🏯 <span id="rAcres">1000</span><small>/90000 mẫu</small></span>
   </div>
 
-  <div id="toolbar"></div>
+  <div id="board">
+    <canvas id="game" width="480" height="320"></canvas>
+    <div id="tileinfo"></div>
+  </div>
 
-  <button class="tool" id="shopBtn"><span class="icon">🛒</span>CỬA HÀNG</button>
-  <button class="tool" id="help"><span class="icon">❓</span>HƯỚNG DẪN</button>
+  <div id="bottombar">
+    <button class="bigbtn" id="btnCity">🏛️ THÀNH PHỐ</button>
+    <button class="bigbtn" id="btnArmy">⚔️ QUÂN ĐỘI</button>
+    <button class="bigbtn" id="btnHelp">❓</button>
+    <button class="bigbtn" id="btnToken" title="Mua Lệnh Chinh Phạt bằng 25🪙">⚔️+ (25🪙)</button>
+  </div>
+</div>
 
-  <div id="toasts"></div>
+<div id="toasts"></div>
 
-  <div id="shop">
-    <div id="shopPanel">
-      <h2>🛒 CỬA HÀNG</h2>
-      <div id="shopItems"></div>
-      <button id="closeShop">ĐÓNG</button>
+<div class="overlay" id="cityOverlay">
+  <div class="panelbox">
+    <h2>🏛️ THÀNH PHỐ</h2>
+    <div id="buildList"></div>
+    <button class="closebtn" data-close="cityOverlay">ĐÓNG</button>
+  </div>
+</div>
+
+<div class="overlay" id="armyOverlay">
+  <div class="panelbox">
+    <h2>⚔️ QUÂN ĐỘI (ĐỒN TRỰC)</h2>
+    <div id="unitList"></div>
+    <p style="font-size:11px;color:#d9b98a;margin-top:6px">
+      Quân trong doanh vừa đi chinh phạt vừa tự động phòng thủ thành khi bị cướp đánh đêm.
+      Tương khắc: Mác ⟶ Kỵ ⟶ Cung ⟶ Mác (x1.5 sát thương)
+    </p>
+    <button class="closebtn" data-close="armyOverlay">ĐÓNG</button>
+  </div>
+</div>
+
+<div class="overlay" id="attackOverlay">
+  <div class="panelbox">
+    <h2>⚔️ CHỌN QUÂN TẤN CÔNG</h2>
+    <div id="enemyInfo" style="text-align:center;font-size:13px;margin-bottom:10px"></div>
+    <div id="attackUnits"></div>
+    <div style="display:flex;gap:10px;justify-content:center;margin-top:10px">
+      <button class="actbtn red" id="doAttack" style="font-size:14px;padding:10px 22px">🔥 TẤN CÔNG!</button>
+      <button class="closebtn" style="margin:0" data-close="attackOverlay">HỦY</button>
     </div>
+  </div>
+</div>
+
+<div class="overlay" id="battleOverlay">
+  <div class="panelbox">
+    <h2>🔥 TRẬN CHIẾN</h2>
+    <div id="vsRow"></div>
+    <div id="battleLog"></div>
+    <button class="closebtn" id="battleClose" style="display:none">ĐÓNG</button>
+  </div>
+</div>
+
+<div id="endScreen">
+  <div>
+    <h1 id="endTitle"></h1>
+    <p id="endText"></p>
+    <button class="bigbtn primary" id="endBtn">CHƠI LẠI</button>
   </div>
 </div>
 
@@ -202,624 +278,668 @@
 (() => {
 "use strict";
 
-/* ================= CẤU HÌNH CHUNG ================= */
-const W = 480, H = 320;
+const TILE = 40, MAP_W = 12, MAP_H = 8;
+const W = MAP_W * TILE, H = MAP_H * TILE;
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 ctx.imageSmoothingEnabled = false;
 
-function fitCanvas() {
-  const scale = Math.max(1, Math.floor(Math.min(innerWidth / W, innerHeight / H)));
-  canvas.style.width = (W * scale) + 'px';
-  canvas.style.height = (H * scale) + 'px';
+function fit() {
+  const availW = innerWidth - 16;
+  const availH = innerHeight - 130;
+  const s = Math.min(availW / W, availH / H, 3);
+  const sc = Math.max(1, s);
+  canvas.style.width = (W * sc) + 'px';
+  canvas.style.height = (H * sc) + 'px';
 }
-addEventListener('resize', fitCanvas);
-fitCanvas();
+addEventListener('resize', fit);
 
-/* ================= CÂY TRỒNG ================= */
-const CROPS = {
-  turnip:  { name: 'Củ Cải',   emoji: '🥬', seedCost: 10, sellPrice: 25, growTime: 20,  color: '#e8e4f5', leaf: '#8fd45a', water: 1 },
-  carrot:  { name: 'Cà Rốt',   emoji: '🥕', seedCost: 18, sellPrice: 48, growTime: 40,  color: '#ff8b2a', leaf: '#5aa832', water: 1 },
-  tomato:  { name: 'Cà Chua',  emoji: '🍅', seedCost: 30, sellPrice: 85, growTime: 70,  color: '#e8382a', leaf: '#4d9c2e', water: 2 },
-  corn:    { name: 'Bắp',      emoji: '🌽', seedCost: 55, sellPrice: 160, growTime: 110, color: '#ffd23e', leaf: '#3f8c26', water: 2 },
-  pumpkin: { name: 'Bí Ngô',   emoji: '🎃', seedCost: 90, sellPrice: 280, growTime: 160, color: '#ff9c1a', leaf: '#357a1e', water: 3 },
-  melon:   { name: 'Dưa Hấu',  emoji: '🍉', seedCost: 140, sellPrice: 460, growTime: 220, color: '#2f9e44', leaf: '#20701f', water: 3 },
+const UNITS = {
+  spear:  { name: 'Lính Mác',  em: '🔱', atk: 10, hp: 35, counter: 'cav',    counterName: 'Kỵ Binh',
+            cost: { crop: 30, wood: 10 }, bld: 'barracks' },
+  archer: { name: 'Cung Thủ',  em: '🏹', atk: 14, hp: 22, counter: 'spear',  counterName: 'Lính Mác',
+            cost: { crop: 40, wood: 40 }, bld: 'range' },
+  cav:    { name: 'Kỵ Binh',   em: '🐎', atk: 20, hp: 40, counter: 'archer', counterName: 'Cung Thủ',
+            cost: { crop: 60, wood: 30, stone: 30, gold: 5 }, bld: 'stable' },
+};
+const UNIT_KEYS = ['spear', 'archer', 'cav'];
+
+const BUILDINGS = {
+  capital:   { name: 'Chủ Thành',     em: '🏯', max: 5, desc: l => `Trung tâm đế quốc. Mở giới hạn nâng cấp các công trình khác (tối đa cấp ${l}). Máu thành: ${80 + 40 * l}` ,
+               cost: l => ({ wood: 120 * Math.pow(1.7, l - 1), stone: 80 * Math.pow(1.7, l - 1) }) },
+  barn:      { name: 'Lương Thảo',    em: '🌾', max: 5, desc: l => `Kho lương. Giới hạn 🌾: ${300 + 500 * l}`,
+               cost: l => ({ wood: 80 * Math.pow(1.7, l - 1), stone: 40 * Math.pow(1.7, l - 1) }) },
+  warehouse: { name: 'Kho Vật Tư',    em: '📦', max: 5, desc: l => `Kho gỗ & đá. Giới hạn 🪵🪨: ${250 + 400 * l}`,
+               cost: l => ({ wood: 40 * Math.pow(1.7, l - 1), stone: 80 * Math.pow(1.7, l - 1) }) },
+  barracks:  { name: 'Doanh Trại',    em: '🔱', max: 5, desc: l => `Tuyển Lính Mác. Tăng ${10 * l}% tấn công toàn quân`,
+               cost: l => ({ wood: 100 * Math.pow(1.7, l - 1), crop: 60 * Math.pow(1.7, l - 1) }) },
+  range:     { name: 'Trường Cung',   em: '🏹', max: 5, desc: l => `Tuyển Cung Thủ. Tăng ${10 * l}% tấn công toàn quân`,
+               cost: l => ({ wood: 120 * Math.pow(1.7, l - 1), stone: 80 * Math.pow(1.7, l - 1) }) },
+  stable:    { name: 'Chuồng Ngựa',   em: '🐎', max: 5, desc: l => `Tuyển Kỵ Binh. Tăng ${10 * l}% tấn công toàn quân`,
+               cost: l => ({ wood: 150 * Math.pow(1.7, l - 1), stone: 100 * Math.pow(1.7, l - 1) }) },
+  watchtower:{ name: 'Tiểu Lâu',      em: '🗼', max: 5, desc: l => `Phòng thủ thành +${15 * l}% sức mạnh`,
+               cost: l => ({ stone: 100 * Math.pow(1.7, l - 1), wood: 60 * Math.pow(1.7, l - 1) }) },
 };
 
-const TOOLS = [
-  { id: 'hoe',     icon: '⛏️', label: 'CUỐC',   cost: 0 },
-  { id: 'seed',    icon: '🌱', label: 'GIEO',   cost: 0 },
-  { id: 'water',   icon: '💧', label: 'TƯỚI',   cost: 0 },
-  { id: 'harvest', icon: '🧺', label: 'THU',    cost: 0 },
-  { id: 'pick',    icon: '🐓', label: 'CHĂN',   cost: 0 },
-];
-
-/* ================= TRẠNG THÁI GAME ================= */
-const PLOT_COLS = 8, PLOT_ROWS = 4;
-const state = {
-  coins: 50,
-  energy: 100,
-  maxEnergy: 100,
-  day: 1,
-  time: 6 * 60,          // phút trong ngày
-  tool: 'hoe',
-  seed: 'turnip',
-  unlockedSeeds: ['turnip', 'carrot'],
-  plots: [],
-  animals: [],
-  autoWaterer: false,
-  sprinkler: false,
-  weather: 'sun',        // sun | rain
-  weatherTimer: 0,
-  particles: [],
-  floats: [],
+const TILE_INFO = {
+  fortress: { name: 'Chủ Thành', em: '🏯' },
+  crop:     { name: 'Ô Lương Điền', em: '🌾' },
+  wood:     { name: 'Ô Rừng Gỗ', em: '🌲' },
+  stone:    { name: 'Ô Mỏ Đá', em: '⛰️' },
+  plain:    { name: 'Đất Trống', em: '🌱' },
 };
 
-for (let i = 0; i < PLOT_COLS * PLOT_ROWS; i++) {
-  state.plots.push({
-    tilled: false, watered: false,
-    crop: null, plantedAt: 0, growth: 0, stage: 0, ready: false, wilted: false,
-  });
+const SAVE_KEY = 'chin-van-mau-strategy-v1';
+
+function genGarrison(level, plain) {
+  const m = plain ? 0.5 : 1;
+  const g = { spear: 0, archer: 0, cav: 0 };
+  const base = [0, 5, 11, 20, 34, 55][level];
+  g.spear = Math.round(base * m);
+  g.archer = Math.round(base * 0.45 * m);
+  g.cav = level >= 2 ? Math.round(base * 0.22 * m) : 0;
+  return g;
 }
 
-const SAVE_KEY = 'vuon-chin-van-mau-v1';
-function save() {
-  try {
-    localStorage.setItem(SAVE_KEY, JSON.stringify({
-      coins: state.coins, energy: state.energy, maxEnergy: state.maxEnergy,
-      day: state.day, time: state.time, seed: state.seed,
-      unlockedSeeds: state.unlockedSeeds, plots: state.plots,
-      animals: state.animals, autoWaterer: state.autoWaterer, sprinkler: state.sprinkler,
-    }));
-  } catch (e) {}
+function newGame() {
+  const tiles = [];
+  const fx = 5 + (MAP_W % 2), fy = 3;
+  for (let y = 0; y < MAP_H; y++) {
+    for (let x = 0; x < MAP_W; x++) {
+      if (x === fx && y === fy) {
+        tiles.push({ x, y, type: 'fortress', level: 1, owner: 'player', g: { spear: 0, archer: 0, cav: 0 } });
+        continue;
+      }
+      const r = Math.random();
+      let type = 'plain';
+      if (r < 0.32) type = 'crop';
+      else if (r < 0.62) type = 'wood';
+      else if (r < 0.82) type = 'stone';
+      let level = 1;
+      const lr = Math.random();
+      if (lr < 0.45) level = 1;
+      else if (lr < 0.75) level = 2;
+      else if (lr < 0.92) level = 3;
+      else if (lr < 0.985) level = 4;
+      else level = 5;
+      tiles.push({ x, y, type, level, owner: 'bandit', g: genGarrison(level, type === 'plain') });
+    }
+  }
+  return {
+    res: { crop: 300, wood: 200, stone: 120, gold: 30 },
+    tokens: 5,
+    buildings: { capital: 1, barn: 1, warehouse: 1, barracks: 1, range: 0, stable: 0, watchtower: 1 },
+    army: { spear: 8, archer: 0, cav: 0 },
+    tiles,
+    fortressHp: 100,
+    time: 0,
+    raidTimer: 150,
+    raidWarned: false,
+    conquered: 0,
+    over: false,
+  };
 }
-function load() {
-  try {
-    const raw = localStorage.getItem(SAVE_KEY);
-    if (!raw) return;
+
+let state = newGame();
+try {
+  const raw = localStorage.getItem(SAVE_KEY);
+  if (raw) {
     const d = JSON.parse(raw);
-    Object.assign(state, d);
-    state.tool = 'hoe';
-    state.particles = []; state.floats = [];
-  } catch (e) {}
+    if (d && d.tiles && d.tiles.length === MAP_W * MAP_H) state = d;
+  }
+} catch (e) {}
+function save() {
+  try { localStorage.setItem(SAVE_KEY, JSON.stringify(state)); } catch (e) {}
 }
-load();
 
-/* ================= HUD / UI ================= */
 const $ = id => document.getElementById(id);
 function toast(msg) {
   const t = document.createElement('div');
   t.className = 'toast';
   t.textContent = msg;
   $('toasts').appendChild(t);
-  setTimeout(() => t.remove(), 1800);
+  setTimeout(() => t.remove(), 2400);
 }
 
-function buildToolbar() {
-  const bar = $('toolbar');
-  bar.innerHTML = '';
-  TOOLS.forEach(t => {
-    const b = document.createElement('button');
-    b.className = 'tool' + (state.tool === t.id ? ' active' : '');
-    b.innerHTML = `<span class="icon">${t.icon}</span>${t.label}`;
-    b.onclick = () => { state.tool = t.id; buildToolbar(); };
-    bar.appendChild(b);
+function bLevel(k) { return state.buildings[k] || 0; }
+function caps() {
+  return {
+    crop: 300 + 500 * bLevel('barn'),
+    wood: 250 + 400 * bLevel('warehouse'),
+    stone: 250 + 400 * bLevel('warehouse'),
+  };
+}
+function atkBonus() { return 1 + 0.10 * Math.max(bLevel('barracks'), bLevel('range'), bLevel('stable')); }
+function defBonus() { return 1 + 0.15 * bLevel('watchtower'); }
+function maxFortHp() { return 80 + 40 * bLevel('capital'); }
+function ownedTiles() { return state.tiles.filter(t => t.owner === 'player'); }
+function acres() { return ownedTiles().length * 1000; }
+function tileIdx(x, y) { return y * MAP_W + x; }
+function neighbors(t) {
+  const out = [];
+  [[1,0],[-1,0],[0,1],[0,-1]].forEach(([dx,dy]) => {
+    const x = t.x + dx, y = t.y + dy;
+    if (x >= 0 && x < MAP_W && y >= 0 && y < MAP_H) out.push(state.tiles[tileIdx(x, y)]);
+  });
+  return out;
+}
+function isAttackable(t) {
+  return t.owner === 'bandit' && neighbors(t).some(n => n.owner === 'player');
+}
+function armyPower(a, opp) {
+  let p = 0;
+  UNIT_KEYS.forEach(k => {
+    if (a[k] <= 0) return;
+    let mult = 1;
+    if (opp && opp[UNITS[k].counter] > 0) mult = 1.5;
+    p += a[k] * UNITS[k].atk * mult;
+  });
+  return p * atkBonus();
+}
+function armyHp(a) {
+  return a.spear * 35 + a.archer * 22 + a.cav * 40;
+}
+function applyCasualties(a, dmg) {
+  const total = armyHp(a);
+  if (total <= 0) return;
+  const ratio = Math.min(1, dmg / total);
+  UNIT_KEYS.forEach(k => {
+    if (a[k] <= 0) return;
+    const dead = a[k] * ratio;
+    const fl = Math.floor(dead);
+    a[k] = Math.max(0, a[k] - fl - (Math.random() < dead - fl ? 1 : 0));
   });
 }
-buildToolbar();
+function cloneArmy(a) { return { spear: a.spear, archer: a.archer, cav: a.cav }; }
+function armyEmpty(a) { return UNIT_KEYS.every(k => a[k] <= 0); }
+
+function simulateBattle(atkIn, defIn, defMult) {
+  const atk = cloneArmy(atkIn), def = cloneArmy(defIn);
+  const log = [];
+  let round = 0;
+  while (round < 12 && !armyEmpty(atk) && !armyEmpty(def)) {
+    round++;
+    const pAtk = armyPower(atk, def) * (0.85 + Math.random() * 0.3);
+    const pDef = armyPower(def, atk) * defMult * (0.85 + Math.random() * 0.3);
+    applyCasualties(def, pAtk);
+    applyCasualties(atk, pDef);
+    log.push({ round, pAtk: Math.round(pAtk), pDef: Math.round(pDef) });
+  }
+  const atkHp = armyHp(atk), defHp = armyHp(def);
+  const win = !armyEmpty(atk) && (armyEmpty(def) || atkHp >= defHp);
+  return { win, atk, def, log, rounds: round };
+}
+
+function prodRates() {
+  let crop = 5, wood = 5, stone = 5;
+  ownedTiles().forEach(t => {
+    if (t.type === 'crop') crop += 15 * t.level;
+    else if (t.type === 'wood') wood += 12 * t.level;
+    else if (t.type === 'stone') stone += 10 * t.level;
+  });
+  return { crop: crop / 60, wood: wood / 60, stone: stone / 60 };
+}
+
+function pay(cost) {
+  for (const k in cost) if (state.res[k] < cost[k]) return false;
+  for (const k in cost) state.res[k] -= cost[k];
+  return true;
+}
+function costStr(cost) {
+  const icons = { crop: '🌾', wood: '🪵', stone: '🪨', gold: '🪙' };
+  return Object.entries(cost).map(([k, v]) => `${icons[k]}${Math.ceil(v)}`).join(' ');
+}
 
 function updateHUD() {
-  $('coins').textContent = state.coins;
-  $('energy').textContent = Math.floor(state.energy);
-  $('day').textContent = state.day;
-  const h = Math.floor(state.time / 60), m = Math.floor(state.time % 60);
-  const icon = state.weather === 'rain' ? '🌧️' : (h < 6 || h >= 19 ? '🌙' : (h < 16 ? '☀️' : '🌇'));
-  $('clock').textContent = `${icon} ${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+  const c = caps();
+  $('rCrop').textContent = Math.floor(state.res.crop);
+  $('rWood').textContent = Math.floor(state.res.wood);
+  $('rStone').textContent = Math.floor(state.res.stone);
+  $('rGold').textContent = Math.floor(state.res.gold);
+  $('capCrop').textContent = c.crop;
+  $('capWood').textContent = c.wood;
+  $('capStone').textContent = c.stone;
+  $('rTokens').textContent = state.tokens;
+  $('maxTokens').textContent = 5;
+  $('rAcres').textContent = acres().toLocaleString('vi-VN');
+  $('btnToken').disabled = state.res.gold < 25 || state.tokens >= 5;
 }
-updateHUD();
 
-/* Cửa hàng */
-const SHOP_ITEMS = [
-  ...Object.entries(CROPS).map(([id, c]) => ({
-    type: 'seed', id,
-    emoji: c.emoji, name: 'Hạt ' + c.name,
-    desc: `Thời gian: ${c.growTime}s · Bán: ${c.sellPrice}🪙 · Cần tưới: ${c.water}`,
-    price: c.seedCost,
-    locked: !state.unlockedSeeds.includes(id),
-  })),
-  { type: 'unlock', id: 'tomato',  emoji: '🔓', name: 'Mở khóa Cà Chua', desc: 'Mở hạt giống Cà Chua trong cửa hàng', price: 120, need: 'tomato' },
-  { type: 'unlock', id: 'corn',    emoji: '🔓', name: 'Mở khóa Bắp',     desc: 'Mở hạt giống Bắp trong cửa hàng',     price: 300, need: 'corn' },
-  { type: 'unlock', id: 'pumpkin', emoji: '🔓', name: 'Mở khóa Bí Ngô',  desc: 'Mở hạt giống Bí Ngô trong cửa hàng',  price: 700, need: 'pumpkin' },
-  { type: 'unlock', id: 'melon',   emoji: '🔓', name: 'Mở khóa Dưa Hấu', desc: 'Mở hạt giống Dưa Hấu trong cửa hàng', price: 1500, need: 'melon' },
-  { type: 'energy', id: 'energy',  emoji: '🥐', name: 'Bánh Mì (+50⚡)',  desc: 'Hồi 50 năng lượng ngay lập tức',      price: 40 },
-  { type: 'upgrade', id: 'maxEnergy', emoji: '💪', name: 'Nâng Max Energy (+25)', desc: 'Tăng năng lượng tối đa lên 25 điểm', price: 250 },
-  { type: 'upgrade', id: 'sprinkler', emoji: '🚿', name: 'Hệ thống phun nước', desc: 'Tưới toàn bộ luống mỗi sáng (tự động)', price: 800 },
-  { type: 'animal', id: 'chicken', emoji: '🐔', name: 'Gà Đẻ Trứng', desc: 'Mỗi ngày đẻ 1 trứng (bán 30🪙)', price: 200 },
-  { type: 'animal', id: 'cow',     emoji: '🐄', name: 'Bò Cho Sữa',   desc: 'Mỗi ngày cho 1 sữa (bán 80🪙)',   price: 600 },
-];
+/* ================= HÀNH ĐỘNG ================= */
+function upgradeBuilding(k) {
+  const B = BUILDINGS[k];
+  const lvl = bLevel(k);
+  if (lvl >= B.max) return;
+  if (k !== 'capital' && lvl >= bLevel('capital')) { toast('🏛️ Cần nâng Chủ Thành trước!'); return; }
+  const cost = B.cost(lvl);
+  if (!pay(cost)) { toast('Không đủ tài nguyên: ' + costStr(cost)); return; }
+  state.buildings[k] = lvl + 1;
+  if (k === 'capital') state.fortressHp = Math.min(maxFortHp(), state.fortressHp + 40);
+  toast(`⬆️ ${B.name} lên cấp ${lvl + 1}!`);
+  renderCity(); updateHUD(); save();
+}
 
-function renderShop() {
-  const box = $('shopItems');
+function recruit(k, n) {
+  const U = UNITS[k];
+  if (bLevel(U.bld) < 1) { toast('Cần xây ' + BUILDINGS[U.bld].name + ' trước!'); return; }
+  let done = 0;
+  for (let i = 0; i < n; i++) {
+    if (!pay(U.cost)) break;
+    state.army[k]++;
+    done++;
+  }
+  if (done > 0) toast(`${U.em} +${done} ${U.name}`);
+  else toast('Không đủ tài nguyên: ' + costStr(U.cost));
+  renderArmy(); updateHUD(); save();
+}
+
+let pendingAttackTile = -1;
+let attackComp = { spear: 0, archer: 0, cav: 0 };
+
+function openAttack(idx) {
+  const t = state.tiles[idx];
+  if (state.tokens < 1) { toast('⚔️ Hết Lệnh Chinh Phạt! Hồi 1 lệnh mỗi phút'); return; }
+  if (armyEmpty(state.army)) { toast('Không có quân! Tuyển quân ở ⚔️ QUÂN ĐỘI'); return; }
+  pendingAttackTile = idx;
+  attackComp = { spear: 0, archer: 0, cav: 0 };
+  const info = $('enemyInfo');
+  const est = Math.round(armyPower(t.g, { spear: 10, archer: 10, cav: 10 }) / 10) * 10;
+  info.innerHTML = `${TILE_INFO[t.type].em} <b>${TILE_INFO[t.type].name} cấp ${t.level}</b> — Quân địch: ` +
+    `🔱${t.g.spear} 🏹${t.g.archer} 🐎${t.g.cav} <small>(sức mạnh ~${est})</small>`;
+  const box = $('attackUnits');
   box.innerHTML = '';
-  SHOP_ITEMS.forEach(item => {
+  UNIT_KEYS.forEach(k => {
+    const U = UNITS[k];
+    const have = state.army[k];
     const row = document.createElement('div');
-    row.className = 'shop-row';
-    let extra = '', disabled = false, label = `Mua <span class="price">${item.price}🪙</span>`;
-
-    if (item.type === 'seed') {
-      const owned = state.unlockedSeeds.includes(item.id);
-      if (!owned) { disabled = true; label = '🔒 Đã khóa'; }
-    } else if (item.type === 'unlock') {
-      if (state.unlockedSeeds.includes(item.need)) { disabled = true; label = '✔ Đã mở'; }
-    } else if (item.type === 'upgrade') {
-      if (item.id === 'sprinkler' && state.sprinkler) { disabled = true; label = '✔ Đã có'; }
-      if (item.id === 'maxEnergy' && state.maxEnergy >= 250) { disabled = true; label = '✔ Tối đa'; }
-    } else if (item.type === 'animal') {
-      const count = state.animals.filter(a => a.kind === item.id).length;
-      extra = ` <small>(đang có: ${count})</small>`;
-      if (count >= 5) { disabled = true; label = '✔ Tối đa'; }
-    }
-    if (state.coins < item.price && !disabled) disabled = true;
-
+    row.className = 'unit-row';
     row.innerHTML = `
-      <span class="emoji">${item.emoji}</span>
-      <span class="info"><b>${item.name}${extra}</b><small>${item.desc}</small></span>
-      <button ${disabled ? 'disabled' : ''}>${label}</button>`;
-    row.querySelector('button').onclick = () => buy(item);
+      <span class="em">${U.em}</span>
+      <span class="info"><b>${U.name}</b>
+        <small>Có sẵn: ${have} · Khắc chế ${U.counterName}</small></span>
+      <div class="stepper">
+        <button data-k="${k}" data-d="-1">−</button>
+        <span id="cnt_${k}">0</span>
+        <button data-k="${k}" data-d="1">+</button>
+        <button data-k="${k}" data-d="all" style="width:auto;padding:0 6px">Max</button>
+      </div>`;
+    box.appendChild(row);
+  });
+  box.querySelectorAll('button').forEach(b => {
+    b.onclick = () => {
+      const k = b.dataset.k, d = b.dataset.d;
+      const have = state.army[k];
+      if (d === 'all') attackComp[k] = have;
+      else attackComp[k] = Math.max(0, Math.min(have, attackComp[k] + parseInt(d)));
+      $('cnt_' + k).textContent = attackComp[k];
+      $('doAttack').disabled = armyEmpty(attackComp);
+    };
+  });
+  $('doAttack').disabled = true;
+  $('attackOverlay').classList.add('open');
+}
+
+$('doAttack').onclick = () => {
+  $('attackOverlay').classList.remove('open');
+  if (state.tokens < 1 || armyEmpty(attackComp)) return;
+  state.tokens--;
+  const t = state.tiles[pendingAttackTile];
+  const result = simulateBattle(attackComp, t.g, 1);
+  UNIT_KEYS.forEach(k => { state.army[k] -= attackComp[k] - result.atk[k]; });
+  showBattle('Bạn', `Quân cướp (cấp ${t.level})`, attackComp, t.g, result, () => {
+    if (result.win) {
+      t.owner = 'player';
+      state.conquered++;
+      const goldGain = 5 * t.level;
+      state.res.gold += goldGain;
+      toast(`🚩 Chiếm được ${TILE_INFO[t.type].name} cấp ${t.level}! +${goldGain}🪙`);
+      if (acres() >= 90000) endGame(true);
+    } else {
+      toast('💀 Trận đánh thất bại, quân về doanh');
+    }
+    updateHUD(); save();
+  });
+};
+
+function showBattle(nameA, nameB, compA, compB, result, onDone) {
+  const logBox = $('battleLog');
+  logBox.innerHTML = '';
+  $('battleClose').style.display = 'none';
+  $('vsRow').innerHTML = `
+    <div class="side"><b>${nameA}</b><div id="hpA"></div></div>
+    <div class="side" style="color:#ffd24a;font-size:20px">⚔️</div>
+    <div class="side"><b>${nameB}</b><div id="hpB"></div></div>`;
+  $('battleOverlay').classList.add('open');
+  const hpA0 = Math.max(1, armyHp(compA)), hpB0 = Math.max(1, armyHp(compB));
+  let i = 0;
+  const step = () => {
+    if (i < result.log.length) {
+      const L = result.log[i];
+      const aHp = armyHp(result.atk), bHp = armyHp(result.def);
+      $('hpA').textContent = `❤️ ${aHp}/${hpA0}`;
+      $('hpB').textContent = `❤️ ${bHp}/${hpB0}`;
+      const div = document.createElement('div');
+      div.className = 'r';
+      div.innerHTML = `Vòng ${L.round}: <span class="good">bạn gây ${L.pAtk}</span> · <span class="bad">địch gây ${L.pDef}</span>`;
+      logBox.appendChild(div);
+      logBox.scrollTop = logBox.scrollHeight;
+      i++;
+      setTimeout(step, 550);
+    } else {
+      const div = document.createElement('div');
+      div.style.fontWeight = 'bold';
+      div.style.fontSize = '14px';
+      if (result.win) { div.className = 'good'; div.textContent = '🏆 CHIẾN THẮNG!'; }
+      else { div.className = 'bad'; div.textContent = '💀 THẤT BẠI!'; }
+      const loss = UNIT_KEYS.map(k => result.atk[k] < compA[k] ? `${UNITS[k].em}-${compA[k] - result.atk[k]}` : '').filter(Boolean).join(' ');
+      if (loss) {
+        const d2 = document.createElement('div');
+        d2.className = 'bad'; d2.style.fontSize = '12px';
+        d2.textContent = 'Thương vong: ' + loss;
+        logBox.appendChild(d2);
+      }
+      logBox.appendChild(div);
+      logBox.scrollTop = logBox.scrollHeight;
+      $('battleClose').style.display = 'block';
+      $('battleClose').onclick = () => {
+        $('battleOverlay').classList.remove('open');
+        if (onDone) onDone();
+      };
+    }
+  };
+  setTimeout(step, 300);
+}
+
+function doRaid() {
+  const day = 1 + Math.floor(state.time / 180);
+  const force = {
+    spear: 3 + 2 * day,
+    archer: 1 + day,
+    cav: Math.floor(day / 2),
+  };
+  const result = simulateBattle(force, state.army, defBonus());
+  const dmg = result.win ? Math.round(armyHp(result.def) * 0.3 + 20) : 0;
+  UNIT_KEYS.forEach(k => { state.army[k] = result.def[k]; });
+  showBattle(`Quân cướp (ngày ${day})`, 'Garnison thành', force, state.army, { ...result, win: !result.win }, () => {
+    if (result.win) {
+      state.fortressHp -= dmg;
+      toast(`🔥 Thành bị phá! Máu thành -${dmg}`);
+      if (state.fortressHp <= 0) { state.fortressHp = 0; endGame(false); }
+    } else {
+      toast('🛡️ Đã đánh bật quân cướp!');
+    }
+    updateHUD(); save();
+  });
+}
+
+function endGame(win) {
+  state.over = true;
+  $('endTitle').textContent = win ? '👑 THỐNG LĨNH CHÍN VẠN MẤU!' : '💀 CHỦ THÀNH SỤP ĐỔ';
+  $('endTitle').style.color = win ? 'var(--gold)' : 'var(--red)';
+  $('endText').textContent = win
+    ? `Bạn đã chinh phạt ${state.conquered} ô đất, đạt ${acres().toLocaleString('vi-VN')} mẫu sau ${Math.floor(state.time / 180) + 1} ngày!`
+    : `Quân cướp đã phá hủy chủ thành. Bạn từng chiếm ${state.conquered} ô đất.`;
+  $('endScreen').classList.add('open');
+}
+$('endBtn').onclick = () => {
+  state = newGame();
+  try { localStorage.removeItem(SAVE_KEY); } catch (e) {}
+  $('endScreen').classList.remove('open');
+  selected = -1;
+  updateHUD(); save();
+};
+
+/* ================= PANELS ================= */
+document.querySelectorAll('[data-close]').forEach(b => {
+  b.onclick = () => $(b.dataset.close).classList.remove('open');
+});
+$('btnCity').onclick = () => { renderCity(); $('cityOverlay').classList.add('open'); };
+$('btnArmy').onclick = () => { renderArmy(); $('armyOverlay').classList.add('open'); };
+$('btnToken').onclick = () => {
+  if (state.res.gold < 25 || state.tokens >= 5) return;
+  state.res.gold -= 25; state.tokens++;
+  toast('⚔️ +1 Lệnh Chinh Phạt');
+  updateHUD(); save();
+};
+$('btnHelp').onclick = () => {
+  toast('🎯 Mục tiêu: đạt 90.000 mẫu đất (90 ô)');
+  setTimeout(() => toast('1️⃣ Cuốc tài nguyên → 2️⃣ Nâng nhà, tuyển quân → 3️⃣ Tấn công ô kề lãnh thổ'), 1000);
+  setTimeout(() => toast('⚠️ Đêm nay quân cướp sẽ đánh thành — giữ quân trong doanh!'), 2200);
+};
+addEventListener('keydown', e => {
+  if (e.key === 'Escape') document.querySelectorAll('.overlay.open').forEach(o => o.classList.remove('open'));
+  if (e.key === 'c' || e.key === 'C') $('btnCity').onclick();
+  if (e.key === 'a' || e.key === 'A') $('btnArmy').onclick();
+});
+
+function renderCity() {
+  const box = $('buildList');
+  box.innerHTML = '';
+  Object.entries(BUILDINGS).forEach(([k, B]) => {
+    const lvl = bLevel(k);
+    const maxed = lvl >= B.max;
+    const gated = k !== 'capital' && lvl >= bLevel('capital');
+    const cost = maxed ? null : B.cost(lvl);
+    let afford = true;
+    if (cost) for (const rk in cost) if (state.res[rk] < cost[rk]) afford = false;
+    const row = document.createElement('div');
+    row.className = 'build-row';
+    row.innerHTML = `
+      <span class="em">${B.em}</span>
+      <span class="info"><b>${B.name} <span class="lvl-badge">Lv ${lvl}/${B.max}</span></b>
+      <small>${B.desc(Math.max(1, lvl))}</small></span>
+      <button class="actbtn ${maxed || gated || !afford ? '' : ''}" ${maxed || gated || !afford ? 'disabled' : ''}>
+        ${maxed ? '✔ Tối đa' : gated ? '🔒 Nâng Chủ Thành' : '⬆️ ' + costStr(cost)}</button>`;
+    row.querySelector('button').onclick = () => upgradeBuilding(k);
     box.appendChild(row);
   });
 }
 
-function buy(item) {
-  if (state.coins < item.price) return;
-  state.coins -= item.price;
-  if (item.type === 'unlock') {
-    state.unlockedSeeds.push(item.need);
-    toast(`🔓 Đã mở khóa ${CROPS[item.need].name}!`);
-  } else if (item.type === 'energy') {
-    state.energy = Math.min(state.maxEnergy, state.energy + 50);
-    toast('🥐 +50 năng lượng!');
-  } else if (item.type === 'upgrade') {
-    if (item.id === 'maxEnergy') { state.maxEnergy += 25; toast('💪 Max Energy +25!'); }
-    if (item.id === 'sprinkler') { state.sprinkler = true; toast('🚿 Đã lắp hệ thống phun nước!'); }
-  } else if (item.type === 'animal') {
-    state.animals.push({ kind: item.id, fed: false, x: 60 + Math.random() * 120, y: 250 + Math.random() * 30, vx: 0, vy: 0, timer: 0 });
-    toast(item.emoji + ' Đã mua!');
-  } else if (item.type === 'seed') {
-    state.seed = item.id;
-    state.tool = 'seed';
-    buildToolbar();
-    toast(`🌱 Đã chọn hạt ${CROPS[item.id].name}`);
-  }
-  updateHUD(); renderShop(); save();
+function renderArmy() {
+  const box = $('unitList');
+  box.innerHTML = '';
+  UNIT_KEYS.forEach(k => {
+    const U = UNITS[k];
+    const locked = bLevel(U.bld) < 1;
+    const row = document.createElement('div');
+    row.className = 'unit-row';
+    row.innerHTML = `
+      <span class="em">${U.em}</span>
+      <span class="info"><b>${U.name} <span class="lvl-badge">x${state.army[k]}</span></b>
+      <small>ATK ${U.atk} · HP ${U.hp} · Khắc chế ${U.counterName} · ${costStr(U.cost)}</small></span>
+      ${locked
+        ? '<button class="actbtn" disabled>🔒 ' + BUILDINGS[U.bld].name + '</button>'
+        : `<div class="stepper">
+             <button class="rec" data-k="${k}" data-n="1">+1</button>
+             <button class="rec" data-k="${k}" data-n="5">+5</button>
+           </div>`}`;
+    box.appendChild(row);
+  });
+  box.querySelectorAll('.rec').forEach(b => {
+    b.onclick = () => recruit(b.dataset.k, parseInt(b.dataset.n));
+  });
+  const total = UNIT_KEYS.map(k => `${UNITS[k].em}${state.army[k]}`).join('  ');
+  const head = document.createElement('p');
+  head.style.cssText = 'text-align:center;font-size:13px;margin-bottom:8px;color:var(--gold);font-weight:bold';
+  head.textContent = `Tổng quân: ${total} · Sức mạnh ~${Math.round(armyPower(state.army, null))}`;
+  box.prepend(head);
 }
 
-$('shopBtn').onclick = () => { renderShop(); $('shop').classList.add('open'); };
-$('closeShop').onclick = () => $('shop').classList.remove('open');
-$('help').onclick = () => {
-  toast('⛏️ Cuốc đất → 🌱 Gieo hạt → 💧 Tưới nước → 🧺 Thu hoạch');
-  setTimeout(() => toast('🛒 Mua hạt giống ở cửa hàng · Cây héo nếu thiếu nước!'), 900);
-};
+/* ================= BẢN ĐỒ ================= */
+let selected = -1;
+let hoverIdx = -1;
 
-/* ================= TOẠ ĐỒ NÔNG TRẠI ================= */
-const FIELD = { x: 64, y: 96, w: PLOT_COLS * 40, h: PLOT_ROWS * 36 };
-const HOUSE = { x: 20, y: 20 };
-
-function plotAt(px, py) {
-  if (px < FIELD.x || py < FIELD.y || px >= FIELD.x + FIELD.w || py >= FIELD.y + FIELD.h) return -1;
-  const col = Math.floor((px - FIELD.x) / 40);
-  const row = Math.floor((py - FIELD.y) / 36);
-  return row * PLOT_COLS + col;
-}
-
-function spendEnergy(n) {
-  if (state.energy < n) { toast('⚡ Hết năng lượng! Mua bánh mì 🥐'); return false; }
-  state.energy -= n;
-  updateHUD();
-  return true;
-}
-
-function addFloat(x, y, text, color) {
-  state.floats.push({ x, y, text, color: color || '#fff', life: 1 });
+function tileName(t) {
+  return TILE_INFO[t.type].name + (t.type !== 'fortress' ? ` cấp ${t.level}` : '');
 }
 
 canvas.addEventListener('pointerdown', e => {
   const r = canvas.getBoundingClientRect();
-  const px = (e.clientX - r.left) / r.width * W;
-  const py = (e.clientY - r.top) / r.height * H;
-  const idx = plotAt(px, py);
-  if (idx >= 0) interact(idx, px, py);
+  const x = Math.floor((e.clientX - r.left) / r.width * MAP_W);
+  const y = Math.floor((e.clientY - r.top) / r.height * MAP_H);
+  if (x < 0 || x >= MAP_W || y < 0 || y >= MAP_H) return;
+  selected = tileIdx(x, y);
+  renderTileInfo();
 });
 
-function interact(idx, px, py) {
-  const p = state.plots[idx];
-  const cx = FIELD.x + (idx % PLOT_COLS) * 40 + 20;
-  const cy = FIELD.y + Math.floor(idx / PLOT_COLS) * 36 + 18;
-
-  if (state.tool === 'hoe') {
-    if (p.tilled) { toast('Đất đã được cuốc rồi'); return; }
-    if (!spendEnergy(2)) return;
-    p.tilled = true; p.watered = false;
-    spawnDirtParticles(cx, cy);
-    addFloat(cx, cy - 10, '⛏️', '#c8a05a');
-  }
-  else if (state.tool === 'seed') {
-    if (!p.tilled) { toast('Cần cuốc đất trước!'); return; }
-    if (p.crop) { toast('Ô này đã có cây'); return; }
-    const c = CROPS[state.seed];
-    if (state.coins < c.seedCost) { toast('Không đủ tiền mua hạt!'); return; }
-    if (!spendEnergy(1)) return;
-    state.coins -= c.seedCost;
-    p.crop = state.seed; p.growth = 0; p.stage = 0; p.ready = false; p.wilted = false;
-    p.plantedAt = state.day;
-    addFloat(cx, cy - 10, '-' + c.seedCost + '🪙', '#ffd24a');
-    updateHUD();
-  }
-  else if (state.tool === 'water') {
-    if (!p.tilled || !p.crop) { toast('Không có gì để tưới'); return; }
-    if (p.watered) { toast('Đã tưới rồi'); return; }
-    if (!spendEnergy(1)) return;
-    p.watered = true; p.wilted = false;
-    spawnWaterParticles(cx, cy);
-    addFloat(cx, cy - 10, '💧', '#6ec6ff');
-  }
-  else if (state.tool === 'harvest') {
-    if (!p.crop || !p.ready) { toast('Cây chưa chín'); return; }
-    if (!spendEnergy(1)) return;
-    const c = CROPS[p.crop];
-    const bonus = p.wilted ? 0.6 : 1;
-    const gain = Math.floor(c.sellPrice * bonus);
-    state.coins += gain;
-    spawnHarvestParticles(cx, cy, c.color);
-    addFloat(cx, cy - 14, '+' + gain + '🪙', '#ffd24a');
-    p.crop = null; p.ready = false; p.growth = 0; p.stage = 0; p.watered = false;
-    updateHUD();
-  }
-  else if (state.tool === 'pick') {
-    let got = false;
-    state.animals.forEach(a => {
-      if (a.produce) {
-        const gain = a.kind === 'chicken' ? 30 : 80;
-        state.coins += gain;
-        addFloat(a.x, a.y - 14, '+' + gain + '🪙', '#ffd24a');
-        a.produce = false; got = true;
-      }
-    });
-    if (got) { updateHUD(); save(); } else toast('Chưa có sản phẩm để thu');
-  }
-  save();
-}
-
-/* ================= HẠT HIỆU ỨNG ================= */
-function spawnDirtParticles(x, y) {
-  for (let i = 0; i < 8; i++) state.particles.push({
-    x, y, vx: (Math.random() - .5) * 40, vy: -Math.random() * 50 - 10,
-    life: .5, color: '#8a6a3a', size: 2,
-  });
-}
-function spawnWaterParticles(x, y) {
-  for (let i = 0; i < 10; i++) state.particles.push({
-    x: x + (Math.random() - .5) * 24, y: y - 12,
-    vx: 0, vy: 60 + Math.random() * 40, life: .4,
-    color: '#6ec6ff', size: 2,
-  });
-}
-function spawnHarvestParticles(x, y, color) {
-  for (let i = 0; i < 12; i++) state.particles.push({
-    x, y, vx: (Math.random() - .5) * 90, vy: -Math.random() * 70 - 20,
-    life: .7, color, size: 3,
-  });
-}
-
-/* ================= VÒNG LẶP GAME ================= */
-let last = performance.now();
-function update(dt) {
-  state.time += dt * 2;                      // 1 giây thực = 2 phút game
-  if (state.time >= 24 * 60) { state.time -= 24 * 60; newDay(); }
-
-  if (state.weather === 'sun') {
-    state.weatherTimer -= dt;
-    if (state.weatherTimer <= 0 && Math.random() < .002) {
-      state.weather = 'rain'; state.weatherTimer = 30 + Math.random() * 40;
-      toast('🌧️ Trời mưa! Cây được tưới tự động');
-    }
-  } else {
-    state.weatherTimer -= dt;
-    if (state.weatherTimer <= 0) { state.weather = 'sun'; state.weatherTimer = 0; }
-  }
-
-  state.plots.forEach((p, i) => {
-    if (!p.crop || p.ready) return;
-    const watered = p.watered || state.weather === 'rain';
-    if (watered) {
-      p.growth += dt / CROPS[p.crop].growTime;
-      if (p.growth >= 1) { p.growth = 1; p.ready = true; p.wilted = false; }
-      p.stage = Math.min(3, Math.floor(p.growth * 4));
-    } else {
-      p.dryTime = (p.dryTime || 0) + dt;
-      if (p.dryTime > 25 && p.stage > 0) p.wilted = true;
-    }
-    if (watered) p.dryTime = 0;
-  });
-
-  state.animals.forEach(a => {
-    a.timer -= dt;
-    if (a.timer <= 0) {
-      a.timer = 1 + Math.random() * 2;
-      a.vx = (Math.random() - .5) * 20;
-      a.vy = (Math.random() - .5) * 10;
-    }
-    a.x += a.vx * dt; a.y += a.vy * dt;
-    a.x = Math.max(30, Math.min(200, a.x));
-    a.y = Math.max(240, Math.min(295, a.y));
-  });
-
-  state.particles = state.particles.filter(pt => {
-    pt.life -= dt;
-    pt.x += pt.vx * dt; pt.y += pt.vy * dt;
-    pt.vy += 160 * dt;
-    return pt.life > 0;
-  });
-  state.floats = state.floats.filter(f => {
-    f.life -= dt * .8; f.y -= 20 * dt;
-    return f.life > 0;
-  });
-
-  updateHUD();
-}
-
-function newDay() {
-  state.day++;
-  state.energy = state.maxEnergy;
-  state.plots.forEach(p => {
-    if (p.crop && !p.ready) {
-      if (!p.watered && state.weather !== 'rain') p.wilted = true;
-      p.watered = false;
-    }
-    p.dryTime = 0;
-  });
-  if (state.sprinkler) {
-    state.plots.forEach(p => { if (p.tilled && p.crop) p.watered = true; });
-    toast('🚿 Hệ thống phun nước đã tưới toàn bộ luống!');
-  }
-  state.animals.forEach(a => { a.produce = true; });
-  state.weather = Math.random() < .25 ? 'rain' : 'sun';
-  state.weatherTimer = 0;
-  toast(`📅 Ngày ${state.day} bắt đầu! ⚡ Đã hồi đầy`);
-  save();
-}
-
-/* ================= VẼ PIXEL ART ================= */
-function px(x, y, w, h, c) { ctx.fillStyle = c; ctx.fillRect(x | 0, y | 0, w, h); }
-
-function drawSky() {
-  const h = Math.floor(state.time / 60);
-  let top, bot;
-  if (h < 6)       { top = '#0d1030'; bot = '#1c2b52'; }
-  else if (h < 8)  { top = '#3a4a8c'; bot = '#f2a65a'; }
-  else if (h < 16) { top = '#63b4e8'; bot = '#a8dcf0'; }
-  else if (h < 19) { top = '#4a5aa0'; bot = '#f28c5a'; }
-  else             { top = '#101638'; bot = '#28305c'; }
-  const g = ctx.createLinearGradient(0, 0, 0, H * .6);
-  g.addColorStop(0, top); g.addColorStop(1, bot);
-  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H * .6);
-
-  if (h >= 6 && h < 20 && state.weather === 'sun') {
-    const sx = 380 + Math.sin(state.time / 60 * Math.PI) * 0;
-    px(396, 26, 18, 18, '#ffe98a');
-    px(400, 22, 10, 26, '#ffe98a');
-    px(390, 30, 30, 10, '#ffe98a');
-  }
-  if (state.weather === 'rain') {
-    ctx.fillStyle = 'rgba(40,50,80,.35)';
-    ctx.fillRect(0, 0, W, H);
-    ctx.strokeStyle = 'rgba(160,200,255,.5)';
-    ctx.lineWidth = 1;
-    for (let i = 0; i < 40; i++) {
-      const rx = (i * 97 + (state.time * 300) % 480) % W;
-      const ry = (i * 53 + (state.time * 500) % 200) % 200;
-      ctx.beginPath(); ctx.moveTo(rx, ry); ctx.lineTo(rx - 2, ry + 6); ctx.stroke();
-    }
-  }
-  // mây
-  const cloudX = (state.time * 4) % (W + 80) - 40;
-  drawCloud(cloudX, 34);
-  drawCloud((cloudX + 200) % (W + 80) - 40, 54);
-}
-function drawCloud(x, y) {
-  ctx.fillStyle = 'rgba(255,255,255,.75)';
-  px(x, y, 26, 8, 'rgba(255,255,255,.75)');
-  px(x + 5, y - 5, 16, 6, 'rgba(255,255,255,.75)');
-  px(x + 20, y + 2, 18, 6, 'rgba(255,255,255,.75)');
-}
-
-function drawMountains() {
-  const base = 96;
-  ctx.fillStyle = '#3f6a4a';
-  tri(0, base, 90, base - 46); tri(60, base, 150, base - 30);
-  ctx.fillStyle = '#35593e';
-  tri(300, base, 400, base - 52); tri(370, base, 470, base - 34);
-}
-function tri(x, y, tx, ty) {
-  ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(tx, ty); ctx.lineTo(x + (tx - x) * 2, y); ctx.fill();
-}
-
-function drawHouse() {
-  const x = HOUSE.x, y = HOUSE.y;
-  px(x, y + 22, 52, 34, '#b8865a');        // tường
-  px(x, y + 22, 52, 4, '#8a6238');
-  ctx.fillStyle = '#a03028';                // mái
-  ctx.beginPath(); ctx.moveTo(x - 6, y + 24); ctx.lineTo(x + 26, y); ctx.lineTo(x + 58, y + 24); ctx.fill();
-  px(x + 8, y + 34, 12, 12, '#5a3a1e');     // cửa
-  px(x + 32, y + 32, 12, 10, '#8ed0f0');    // cửa sổ
-  px(x + 37, y + 32, 2, 10, '#5a3a1e');
-  px(x + 32, y + 36, 12, 2, '#5a3a1e');
-  px(x + 40, y + 8, 8, 12, '#8a6238');      // ống khói
-}
-
-function drawField() {
-  // cỏ nền
-  ctx.fillStyle = '#5a9e3a';
-  ctx.fillRect(0, 96, W, H - 96);
-  // sọc cỏ
-  for (let y = 96; y < H; y += 8) px(0, y, W, 1, '#4f8f33');
-
-  state.plots.forEach((p, i) => {
-    const x = FIELD.x + (i % PLOT_COLS) * 40;
-    const y = FIELD.y + Math.floor(i / PLOT_COLS) * 36;
-    drawPlot(p, x, y, i);
-  });
-}
-
-function drawPlot(p, x, y, i) {
-  px(x + 1, y + 1, 38, 34, p.tilled ? '#6b4a2a' : '#5a9e3a');
-  if (p.tilled) {
-    px(x + 1, y + 1, 38, 34, '#7a5533');
-    for (let r = 0; r < 4; r++) px(x + 4, y + 6 + r * 8, 32, 3, '#5f3f22');
-    if (p.watered || state.weather === 'rain') {
-      ctx.fillStyle = 'rgba(50,60,120,.4)';
-      ctx.fillRect(x + 1, y + 1, 38, 34);
-    }
-  }
-  // viền ô
-  ctx.strokeStyle = 'rgba(0,0,0,.15)';
-  ctx.strokeRect(x + 1.5, y + 1.5, 37, 33);
-
-  if (p.crop) drawCrop(p, x + 20, y + 26);
-}
-
-function drawCrop(p, cx, cy) {
-  const c = CROPS[p.crop];
-  const stage = p.ready ? 3 : p.stage;
-  const sway = Math.sin(performance.now() / 400 + cx) * (p.ready ? 1.5 : 1);
-
-  if (p.wilted) {
-    px(cx - 1, cy - 6, 2, 6, '#8a7a4a');
-    px(cx - 4, cy - 6, 3, 2, '#9a8a5a');
-    px(cx + 1, cy - 8, 3, 2, '#9a8a5a');
-    return;
-  }
-  if (stage === 0) {
-    px(cx - 1, cy - 3, 2, 3, '#7ec850');
-  } else if (stage === 1) {
-    px(cx - 1, cy - 7, 2, 7, '#5aa832');
-    px(cx - 4, cy - 6, 3, 2, '#7ec850');
-    px(cx + 1, cy - 8, 3, 2, '#7ec850');
-  } else if (stage === 2) {
-    px(cx - 1 + sway, cy - 11, 2, 11, '#4d9c2e');
-    px(cx - 6 + sway, cy - 9, 5, 3, '#7ec850');
-    px(cx + 2 + sway, cy - 11, 5, 3, '#7ec850');
-  } else {
-    px(cx - 1 + sway, cy - 13, 2, 13, '#3f8c26');
-    px(cx - 7 + sway, cy - 11, 6, 3, '#5aa832');
-    px(cx + 2 + sway, cy - 13, 6, 3, '#5aa832');
-    // quả
-    if (p.crop === 'corn') {
-      px(cx - 3 + sway, cy - 9, 6, 8, c.color);
-      px(cx - 2 + sway, cy - 8, 1, 6, '#e8b520');
-      px(cx + 1 + sway, cy - 8, 1, 6, '#e8b520');
-    } else if (p.crop === 'melon') {
-      px(cx - 4 + sway, cy - 8, 9, 8, c.color);
-      px(cx - 2 + sway, cy - 8, 2, 8, '#1a6b1a');
-      px(cx + 2 + sway, cy - 8, 2, 8, '#1a6b1a');
-    } else if (p.crop === 'pumpkin') {
-      px(cx - 5 + sway, cy - 7, 11, 7, c.color);
-      px(cx - 5 + sway, cy - 7, 11, 2, '#ffb84d');
-      px(cx - 1 + sway, cy - 9, 2, 2, '#4d7a1e');
-    } else {
-      px(cx - 3 + sway, cy - 8, 6, 5, c.color);
-      px(cx - 2 + sway, cy - 7, 1, 3, 'rgba(255,255,255,.4)');
-    }
-    if (p.ready) {
-      ctx.fillStyle = '#ffd24a';
-      ctx.font = 'bold 8px monospace';
-      ctx.fillText('!', cx - 1, cy - 16);
-    }
-  }
-}
-
-function drawAnimal(a) {
-  const bob = Math.sin(performance.now() / 200 + a.x) > 0 ? 0 : 1;
-  if (a.kind === 'chicken') {
-    px(a.x - 4, a.y - 8 - bob, 8, 7, '#fff');
-    px(a.x + 2, a.y - 11 - bob, 4, 4, '#fff');
-    px(a.x + 5, a.y - 10 - bob, 2, 2, '#ff9c1a');
-    px(a.x + 3, a.y - 13 - bob, 2, 2, '#e8382a');
-    px(a.x - 3, a.y - 1, 1, 2, '#ff9c1a');
-    px(a.x + 1, a.y - 1, 1, 2, '#ff9c1a');
-  } else {
-    px(a.x - 8, a.y - 10 - bob, 14, 9, '#f5f5f5');
-    px(a.x + 4, a.y - 13 - bob, 6, 6, '#f5f5f5');
-    px(a.x + 8, a.y - 12 - bob, 2, 2, '#3a3a3a');
-    px(a.x - 7, a.y - 1, 2, 3, '#e0e0e0');
-    px(a.x + 2, a.y - 1, 2, 3, '#e0e0e0');
-  }
-  if (a.produce) {
-    px(a.x - 2, a.y - 16, 5, 5, a.kind === 'chicken' ? '#fff8e0' : '#fdf6ee');
-    px(a.x - 2, a.y - 16, 5, 1, '#d8c8a8');
-  }
-}
-
-function drawParticles() {
-  state.particles.forEach(pt => {
-    ctx.globalAlpha = Math.min(1, pt.life * 2);
-    px(pt.x, pt.y, pt.size, pt.size, pt.color);
-  });
-  ctx.globalAlpha = 1;
-  ctx.font = 'bold 9px monospace';
-  state.floats.forEach(f => {
-    ctx.globalAlpha = Math.min(1, f.life * 1.5);
-    ctx.fillStyle = '#000';
-    ctx.fillText(f.text, f.x + 1, f.y + 1);
-    ctx.fillStyle = f.color;
-    ctx.fillText(f.text, f.x, f.y);
-  });
-  ctx.globalAlpha = 1;
-}
-
-function render() {
-  drawSky();
-  drawMountains();
-  drawHouse();
-  drawField();
-  state.animals.forEach(drawAnimal);
-  drawParticles();
-
-  // viền đêm
-  const h = Math.floor(state.time / 60);
-  if (h >= 19 || h < 6) {
-    ctx.fillStyle = 'rgba(10,15,40,.35)';
-    ctx.fillRect(0, 0, W, H);
-  }
-
-  // chuột preview
-  if (hoverIdx >= 0) {
-    const x = FIELD.x + (hoverIdx % PLOT_COLS) * 40;
-    const y = FIELD.y + Math.floor(hoverIdx / PLOT_COLS) * 36;
-    ctx.strokeStyle = '#ffd24a';
-    ctx.lineWidth = 2;
-    ctx.strokeRect(x, y, 40, 36);
-  }
-}
-
-/* Hover */
-let hoverIdx = -1;
 canvas.addEventListener('pointermove', e => {
   const r = canvas.getBoundingClientRect();
-  const px_ = (e.clientX - r.left) / r.width * W;
-  const py_ = (e.clientY - r.top) / r.height * H;
-  hoverIdx = plotAt(px_, py_);
+  const x = Math.floor((e.clientX - r.left) / r.width * MAP_W);
+  const y = Math.floor((e.clientY - r.top) / r.height * MAP_H);
+  hoverIdx = (x >= 0 && x < MAP_W && y >= 0 && y < MAP_H) ? tileIdx(x, y) : -1;
 });
 canvas.addEventListener('pointerleave', () => hoverIdx = -1);
 
-/* Phím tắt */
-addEventListener('keydown', e => {
-  const map = { '1': 'hoe', '2': 'seed', '3': 'water', '4': 'harvest', '5': 'pick' };
-  if (map[e.key]) { state.tool = map[e.key]; buildToolbar(); }
-  if (e.key === 'e' || e.key === 'E') { renderShop(); $('shop').classList.toggle('open'); }
-});
+function renderTileInfo() {
+  const box = $('tileinfo');
+  if (selected < 0) { box.style.display = 'none'; return; }
+  const t = state.tiles[selected];
+  box.style.display = 'block';
+  let html = `<h3>${TILE_INFO[t.type].em} ${tileName(t)}</h3>`;
+  if (t.type === 'fortress') {
+    html += `<div class="row"><span>❤️ Máu thành</span><b>${Math.ceil(state.fortressHp)}/${maxFortHp()}</b></div>
+             <div class="row"><span>🛡️ Phòng thủ</span><b>+${Math.round((defBonus() - 1) * 100)}%</b></div>
+             <button class="actbtn" id="tiOpenCity">🏛️ Mở Thành Phố</button>`;
+  } else if (t.owner === 'player') {
+    const rate = t.type === 'crop' ? `${15 * t.level}🌾/phút` :
+                 t.type === 'wood' ? `${12 * t.level}🪵/phút` :
+                 t.type === 'stone' ? `${10 * t.level}🪨/phút` : '—';
+    html += `<div class="row"><span>🚩 Lãnh thổ của bạn</span><b>+1000 mẫu</b></div>
+             <div class="row"><span>⚙️ Sản lượng</span><b>${rate}</b></div>`;
+  } else {
+    const atkable = isAttackable(t);
+    html += `<div class="row"><span>🏴 Quân cướp</span><b>🔱${t.g.spear} 🏹${t.g.archer} 🐎${t.g.cav}</b></div>
+             <div class="row"><span>💪 Sức mạnh</span><b>~${Math.round(armyPower(t.g, { spear: 10, archer: 10, cav: 10 }) / 10) * 10}</b></div>
+             <button class="actbtn red" id="tiAttack" ${atkable ? '' : 'disabled'}>⚔️ ${atkable ? 'Tấn Công (1 ⚔️lệnh)' : 'Không kề lãnh thổ'}</button>`;
+  }
+  box.innerHTML = html;
+  const oc = $('tiOpenCity');
+  if (oc) oc.onclick = $('btnCity').onclick;
+  const ab = $('tiAttack');
+  if (ab) ab.onclick = () => openAttack(selected);
+}
 
-setInterval(save, 10000);
+/* ================= VẼ ================= */
+function px(x, y, w, h, c) { ctx.fillStyle = c; ctx.fillRect(x | 0, y | 0, w, h); }
+
+function drawTile(t, i) {
+  const x = t.x * TILE, y = t.y * TILE;
+  const shade = (t.x + t.y) % 2 === 0 ? '#6da53f' : '#659c39';
+  px(x, y, TILE, TILE, shade);
+
+  if (t.type === 'crop') {
+    px(x + 5, y + 8, 30, 24, '#8a6a3a');
+    for (let r = 0; r < 4; r++) {
+      px(x + 7, y + 11 + r * 6, 26, 2, '#c8a84a');
+      for (let c = 0; c < 4; c++) px(x + 8 + c * 7, y + 9 + r * 6, 3, 3, t.level >= 3 ? '#ffd24a' : '#9cc84a');
+    }
+  } else if (t.type === 'wood') {
+    const n = Math.min(3, 1 + Math.floor(t.level / 2));
+    for (let k = 0; k < n; k++) {
+      const tx = x + 8 + k * 11, ty = y + 10;
+      px(tx - 1, ty + 16, 3, 5, '#6b4a2a');
+      ctx.fillStyle = '#2e6b2e';
+      ctx.beginPath(); ctx.moveTo(tx, ty - 4); ctx.lineTo(tx - 6, ty + 12); ctx.lineTo(tx + 6, ty + 12); ctx.fill();
+      ctx.fillStyle = '#3f8c3f';
+      ctx.beginPath(); ctx.moveTo(tx, ty - 4); ctx.lineTo(tx - 4, ty + 6); ctx.lineTo(tx + 4, ty + 6); ctx.fill();
+    }
+  } else if (t.type === 'stone') {
+    const n = Math.min(3, 1 + Math.floor(t.level / 2));
+    for (let k = 0; k < n; k++) {
+      const sx = x + 8 + k * 12, sy = y + 18;
+      px(sx, sy, 10, 8, '#8a8a8a');
+      px(sx + 2, sy - 3, 6, 4, '#9a9a9a');
+      px(sx + 1, sy + 1, 3, 2, '#b5b5b5');
+    }
+  } else if (t.type === 'plain') {
+    px(x + 8, y + 26, 2, 3, '#7ec850');
+    px(x + 26, y + 12, 2, 3, '#7ec850');
+    px(x + 18, y + 30, 2, 2, '#ffd24a');
+  } else if (t.type === 'fortress') {
+    px(x + 4, y + 8, 32, 26, '#9a9a9a');
+    px(x + 4, y + 8, 32, 4, '#b5b5b5');
+    for (let c = 0; c < 4; c++) px(x + 4 + c * 9, y + 4, 6, 5, '#b5b5b5');
+    px(x + 15, y + 20, 10, 14, '#4a3220');
+    px(x + 8, y + 14, 6, 6, '#8ed0f0');
+    px(x + 26, y + 14, 6, 6, '#8ed0f0');
+    const hpR = state.fortressHp / maxFortHp();
+    px(x + 4, y + 2, 32, 3, '#3a2a1a');
+    px(x + 4, y + 2, 32 * Math.max(0, hpR), 3, hpR > .5 ? '#7ec850' : hpR > .25 ? '#ffd24a' : '#e04a3a');
+  }
+
+  if (t.type !== 'fortress' && t.type !== 'plain') {
+    const lvlC = ['#c8c8c8', '#c8c8c8', '#7ec850', '#5ab0e8', '#b05ae8', '#ffd24a'][t.level];
+    px(x + 30, y + 28, 9, 10, '#241505');
+    ctx.fillStyle = lvlC;
+    ctx.font = 'bold 9px monospace';
+    ctx.fillText(t.level, x + 32, y + 36);
+  }
+
+  if (t.owner === 'bandit' && t.type !== 'plain') {
+    px(x + 6, y + 6, 2, 12, '#5a3a1e');
+    ctx.fillStyle = '#c0392b';
+    ctx.beginPath(); ctx.moveTo(x + 8, y + 6); ctx.lineTo(x + 18, y + 9); ctx.lineTo(x + 8, y + 12); ctx.fill();
+  } else if (t.owner === 'player' && t.type !== 'fortress') {
+    px(x + 6, y + 6, 2, 12, '#5a3a1e');
+    ctx.fillStyle = '#2e8b2e';
+    ctx.beginPath(); ctx.moveTo(x + 8, y + 6); ctx.lineTo(x + 18, y + 9); ctx.lineTo(x + 8, y + 12); ctx.fill();
+    ctx.strokeStyle = 'rgba(126,200,80,.5)';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(x + 1, y + 1, TILE - 2, TILE - 2);
+  }
+
+  if (isAttackable(t)) {
+    const pulse = 0.5 + 0.5 * Math.sin(performance.now() / 300);
+    ctx.strokeStyle = `rgba(224,74,58,${0.4 + pulse * 0.6})`;
+    ctx.lineWidth = 2;
+    ctx.strokeRect(x + 1.5, y + 1.5, TILE - 3, TILE - 3);
+  }
+
+  if (i === hoverIdx || i === selected) {
+    ctx.strokeStyle = i === selected ? '#ffd24a' : 'rgba(255,255,255,.6)';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(x + 1, y + 1, TILE - 2, TILE - 2);
+  }
+}
+
+function render() {
+  state.tiles.forEach(drawTile);
+}
+
+/* ================= VÒNG LẶP ================= */
+let last = performance.now();
+let hudTick = 0;
+
+function update(dt) {
+  if (state.over) return;
+  state.time += dt;
+  const rates = prodRates();
+  const c = caps();
+  state.res.crop = Math.min(c.crop, state.res.crop + rates.crop * dt);
+  state.res.wood = Math.min(c.wood, state.res.wood + rates.wood * dt);
+  state.res.stone = Math.min(c.stone, state.res.stone + rates.stone * dt);
+
+  if (state.tokens < 5) {
+    state.tokenAcc = (state.tokenAcc || 0) + dt;
+    if (state.tokenAcc >= 60) { state.tokenAcc -= 60; state.tokens++; toast('⚔️ +1 Lệnh Chinh Phạt'); }
+  }
+  if (state.fortressHp < maxFortHp()) state.fortressHp = Math.min(maxFortHp(), state.fortressHp + dt / 3);
+
+  state.raidTimer -= dt;
+  if (state.raidTimer <= 10 && !state.raidWarned) {
+    state.raidWarned = true;
+    toast('⚠️ Quân cướp sắp đánh thành trong 10 giây!');
+  }
+  if (state.raidTimer <= 0) {
+    state.raidTimer = 150 + Math.random() * 60;
+    state.raidWarned = false;
+    doRaid();
+  }
+
+  hudTick += dt;
+  if (hudTick > 0.5) { hudTick = 0; updateHUD(); if (selected >= 0) renderTileInfo(); }
+  save();
+}
 
 function loop(now) {
   const dt = Math.min(.1, (now - last) / 1000);
@@ -828,10 +948,17 @@ function loop(now) {
   render();
   requestAnimationFrame(loop);
 }
+
+fit();
+updateHUD();
+renderTileInfo();
 requestAnimationFrame(loop);
 
-toast('🌾 Chào mừng đến Vườn Chín Vạn Mẫu!');
-setTimeout(() => toast('⛏️ Chọn cuốc và click vào luống đất để bắt đầu!'), 1600);
+if (!state.conquered && state.time === 0) {
+  toast('🏯 Chào mừng Lãnh Chúa! Bạn có 1 mẫu đất...');
+  setTimeout(() => toast('🏹 Tuyển quân, chinh phạt các ô kề nhau để mở rộng lãnh thổ!'), 1800);
+  setTimeout(() => toast('🎯 Mục tiêu: 90.000 mẫu. Cẩn thận quân cướp đánh đêm!'), 3800);
+}
 })();
 </script>
 </body>
