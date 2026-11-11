@@ -72,6 +72,25 @@ Game có **2 lớp đồ hoạ**: pixel art mặc định (vẽ bằng code, có
 
 Pixel art mặc định cũng đã nâng cấp: viền tối, bóng đổ, giáp 2 lớp, mũ sắt có lông cờ, vũ khí kim loại có điểm sáng — kỵ binh cưỡi ngựa đầy đủ, tượng binh có kiệu trên lưng.
 
+## 🏗️ Xây dựng trên ô đất (mới)
+
+Bấm vào **ô đất đã chiếm** để xây công trình (mỗi ô 1 công trình, tối đa cấp 3):
+
+| Công trình | Tác dụng |
+|---|---|
+| 🌾 Nông Trại | +8 🌾/phút mỗi cấp |
+| 🪵 Xưởng Gỗ | +7 🪵/phút mỗi cấp |
+| ⛏️ Mỏ Đá | +6 🪨/phút mỗi cấp |
+| 🚩 Điểm Tập Kết | Hành quân tấn công từ ô này tới ô quân cướp cách tối đa (1 + cấp) ô — đẩy xa tuyến front mà không cần kề lãnh thổ |
+
+Công trình hiển thị **trực tiếp trên ô đất** và **thay đổi hình ảnh khi nâng cấp** (cấp 2 thêm cờ, cấp 3 thêm công trình phụ/giếng/rào).
+
+## 🏰 Bấm vào thành — xem công trình trong thành
+
+Bấm vào ô 🏰 Chủ Thành: ngoài máu thành, phòng thủ, quân đồn trú và võ tướng, giờ hiển thị luôn **toàn bộ 7 công trình trong thành** với icon pixel + nút nâng cấp tại chỗ.
+
+**Icon công trình pixel thay đổi theo cấp**: cấp 2 mọc cờ vàng, cấp 3 móng đá, cấp 4 tháp bên, cấp 5 viền mái vàng. Bản đồ chủ thành cũng lớn dần theo cấp Chủ Thành (tháp đôi → tường đá → mái vàng → cờ vàng).
+
 ## 🌐 Đấu Trường — Sảnh chờ ghép trận
 
 Mở 🌐 **ĐẤU TRƯỜNG** (phím `P`) để vào sảnh chờ ghép trận PVP:

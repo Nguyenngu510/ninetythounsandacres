@@ -197,6 +197,7 @@
   .artrow .info { flex: 1; font-size: 12px; }
   .artrow .info small { color: #d9b98a; }
   canvas.artprev { width: 40px; height: 40px; background: #241505; border: 2px solid var(--panel-light); image-rendering: pixelated; }
+  canvas.bicon { width: 30px; height: 30px; background: #241505; border: 2px solid var(--panel-light); image-rendering: pixelated; flex-shrink: 0; }
   .foundtitle { color: var(--gold); font-weight: bold; font-size: 15px; margin-bottom: 6px; animation: pop .25s ease-out; }
   #toasts {
     position: fixed; top: 12px; left: 50%;
@@ -434,6 +435,14 @@ const TILE_INFO = {
   plain:    { name: 'Đất Trống', em: '🌱' },
 };
 
+const TILE_BUILDINGS = {
+  farm:      { name: 'Nông Trại',    em: '🌾', max: 3, desc: l => `Sản xuất thêm +${8 * l} 🌾/phút`, cost: l => ({ wood: 60 * Math.pow(1.8, l - 1), gold: 10 * l }) },
+  woodcamp:  { name: 'Xưởng Gỗ',     em: '🪵', max: 3, desc: l => `Sản xuất thêm +${7 * l} 🪵/phút`, cost: l => ({ crop: 50 * Math.pow(1.8, l - 1), gold: 10 * l }) },
+  stonemine: { name: 'Mỏ Đá',        em: '⛏️', max: 3, desc: l => `Sản xuất thêm +${6 * l} 🪨/phút`, cost: l => ({ wood: 70 * Math.pow(1.8, l - 1), gold: 12 * l }) },
+  rally:     { name: 'Điểm Tập Kết', em: '🚩', max: 3, desc: l => `Hành quân tấn công từ ô này tới các ô quân cướp cách tối đa ${1 + l} ô`, cost: l => ({ wood: 80 * Math.pow(1.8, l - 1), stone: 40 * Math.pow(1.8, l - 1), gold: 15 * l }) },
+};
+const TILE_BLD_KEYS = Object.keys(TILE_BUILDINGS);
+
 const SAVE_KEY = 'chin-van-mau-strategy-v3';
 
 /* ================= TUỲ BIẾN ĐỒ HOẠ (đổi ảnh quân lính & võ tướng) =================
@@ -617,8 +626,12 @@ function neighbors(t) {
   });
   return out;
 }
+function rallyReach(o) { return o.b && o.b.k === 'rally' ? 1 + o.b.lvl : 0; }
 function isAttackable(t) {
-  return t.owner === 'bandit' && neighbors(t).some(n => n.owner === 'player');
+  if (t.owner !== 'bandit') return false;
+  if (neighbors(t).some(n => n.owner === 'player')) return true;
+  return state.tiles.some(o => o.owner === 'player' &&
+    Math.abs(o.x - t.x) + Math.abs(o.y - t.y) <= rallyReach(o));
 }
 function dayNum() { return 1 + Math.floor(state.time / 180); }
 
@@ -754,6 +767,11 @@ function prodRates() {
     if (t.type === 'crop') crop += 15 * t.level;
     else if (t.type === 'wood') wood += 12 * t.level;
     else if (t.type === 'stone') stone += 10 * t.level;
+    if (t.b) {
+      if (t.b.k === 'farm') crop += 8 * t.b.lvl;
+      else if (t.b.k === 'woodcamp') wood += 7 * t.b.lvl;
+      else if (t.b.k === 'stonemine') stone += 6 * t.b.lvl;
+    }
   });
   return { crop: crop / 60, wood: wood / 60, stone: stone / 60 };
 }
@@ -930,12 +948,17 @@ let pendingAttackTile = -1;
 let attackComp = emptyArmy();
 
 function attackSource(target) {
-  const adj = neighbors(target).filter(n => n.owner === 'player');
-  if (!adj.length) return null;
   const fort = state.tiles.find(t => t.type === 'fortress');
-  adj.sort((a, b) =>
-    (Math.abs(a.x - fort.x) + Math.abs(a.y - fort.y)) - (Math.abs(b.x - fort.x) + Math.abs(b.y - fort.y)));
-  return adj[0];
+  const near = o => (Math.abs(o.x - fort.x) + Math.abs(o.y - fort.y));
+  const adj = neighbors(target).filter(n => n.owner === 'player');
+  if (adj.length) {
+    adj.sort((a, b) => near(a) - near(b));
+    return adj[0];
+  }
+  const rallies = state.tiles.filter(o => o.owner === 'player' &&
+    Math.abs(o.x - target.x) + Math.abs(o.y - target.y) <= rallyReach(o));
+  rallies.sort((a, b) => near(a) - near(b));
+  return rallies[0] || null;
 }
 
 function openAttack(idx) {
@@ -1631,6 +1654,7 @@ $('btnHelp').onclick = () => {
   setTimeout(() => toast('🎖️ Tuyển Võ Tướng để nhận nội tại + kỹ năng mạnh trong trận!'), 2000);
   setTimeout(() => toast('🚨 Quân cướp cũng HÀNH QUÂN ra đánh — trấn giữ ô hoặc về doanh phòng thủ!'), 3000);
   setTimeout(() => toast('🌐 ĐẤU TRƯỜNG: vào sảnh chờ ghép trận PVP, leo bảng Danh Vọng!'), 4000);
+  setTimeout(() => toast('🏗️ Ô đất đã chiếm: bấm vào ô để xây Nông Trại / Xưởng Gỗ / Mỏ Đá / Điểm Tập Kết!'), 5000);
 };
 addEventListener('keydown', e => {
   if (e.key === 'Escape') {
@@ -1705,6 +1729,28 @@ function upgradeBuilding(k) {
   renderCity(); updateHUD(); save();
 }
 
+function buildTileBuilding(idx, k) {
+  const t = state.tiles[idx];
+  const TB = TILE_BUILDINGS[k];
+  if (!t || t.owner !== 'player' || t.type === 'fortress' || t.b) return;
+  const cost = TB.cost(1);
+  if (!pay(cost)) { toast('Không đủ tài nguyên: ' + costStr(cost)); return; }
+  t.b = { k, lvl: 1 };
+  toast(`${TB.em} ${TB.name} đã xây xong trên ô đất!`);
+  renderTileInfo(); updateHUD(); save();
+}
+function upgradeTileBuilding(idx) {
+  const t = state.tiles[idx];
+  if (!t || !t.b) return;
+  const TB = TILE_BUILDINGS[t.b.k];
+  if (t.b.lvl >= TB.max) { toast('✔ Công trình đã đạt cấp tối đa'); return; }
+  const cost = TB.cost(t.b.lvl + 1);
+  if (!pay(cost)) { toast('Không đủ tài nguyên: ' + costStr(cost)); return; }
+  t.b.lvl++;
+  toast(`⬆️ ${TB.name} lên cấp ${t.b.lvl}!`);
+  renderTileInfo(); updateHUD(); save();
+}
+
 function recruit(k, n) {
   const U = UNITS[k];
   if (bLevel(U.bld) < U.req) { toast(`Cần ${BUILDINGS[U.bld].name} cấp ${U.req} trước!`); return; }
@@ -1732,7 +1778,7 @@ function renderCity() {
     const row = document.createElement('div');
     row.className = 'build-row';
     row.innerHTML = `
-      <span class="em">${B.em}</span>
+      <canvas class="bicon" width="30" height="30" data-k="${k}" data-lvl="${lvl}"></canvas>
       <span class="info"><b>${B.name} <span class="lvl-badge">Lv ${lvl}/${B.max}</span></b>
       <small>${B.desc(Math.max(1, lvl))}</small></span>
       <button class="actbtn" ${maxed || gated || !afford ? 'disabled' : ''}>
@@ -1740,6 +1786,7 @@ function renderCity() {
     row.querySelector('button').onclick = () => upgradeBuilding(k);
     box.appendChild(row);
   });
+  box.querySelectorAll('canvas.bicon').forEach(cv => drawBuildingIcon(cv.getContext('2d'), cv.dataset.k, parseInt(cv.dataset.lvl), 30));
 }
 
 function renderArmy() {
@@ -1829,7 +1876,8 @@ function renderTileInfo() {
     if (marchingHere.length) {
       html += `<div class="sect"><small>⚔️ ${marchingHere.length} đoàn quân đang tới đây</small></div>`;
     }
-    html += `<button class="actbtn" id="tiOpenCity">🏛️ Mở Thành Phố</button>`;
+    html += `<div class="sect"><small>🏛️ Công trình trong thành:</small><div id="tiCityList" style="display:flex;flex-direction:column;gap:4px;margin-top:4px"></div></div>
+      <button class="actbtn" id="tiOpenCity">🏛️ Mở Thành Phố</button>`;
   }
   else if (t.owner === 'player') {
     const rate = t.type === 'crop' ? `${15 * t.level}🌾/phút` :
@@ -1837,8 +1885,20 @@ function renderTileInfo() {
                  t.type === 'stone' ? `${10 * t.level}🪨/phút` : '—';
     html += `<div class="row"><span>🚩 Chủ nhân</span><b>Bạn</b></div>
       <div class="row"><span>💰 Đóng góp</span><b>+1.000 mẫu · ${rate}</b></div>
-      <div class="sect"><small>Quân trấn giữ:</small><div class="uline">${unitChips(t.g)}</div>
       <div class="row"><span>💪 Sức mạnh</span><b>~${Math.round(armyPower(t.g, null, 1))}</b></div></div>`;
+    if (t.b) {
+      const TB = TILE_BUILDINGS[t.b.k];
+      const maxed = t.b.lvl >= TB.max;
+      const cost = maxed ? null : TB.cost(t.b.lvl + 1);
+      let afford = true;
+      if (cost) for (const rk in cost) if (state.res[rk] < cost[rk]) afford = false;
+      html += `<div class="sect"><small>🏗️ Công trình trên ô:</small>
+        <div class="row"><span>${TB.em} ${TB.name}</span><b><span class="lvl-badge">Lv ${t.b.lvl}/${TB.max}</span></b></div>
+        <small>${TB.desc(t.b.lvl)}</small>
+        <button class="actbtn" id="tiUpBld" style="margin-top:6px" ${maxed || !afford ? 'disabled' : ''}>${maxed ? '✔ Cấp tối đa' : '⬆️ Nâng cấp ' + costStr(cost)}</button></div>`;
+    } else {
+      html += `<div class="sect"><small>🏗️ Xây công trình trên ô này:</small><div id="tiBuildBtns" style="display:flex;flex-direction:column;gap:4px;margin-top:4px"></div></div>`;
+    }
     if (marchingHere.length) {
       html += `<div class="sect"><small>⚔️ Đang có ${marchingHere.length} đoàn quân tới đây</small></div>`;
     }
@@ -1869,6 +1929,44 @@ function renderTileInfo() {
   box.innerHTML = html;
   const oc = $('tiOpenCity');
   if (oc) oc.onclick = $('btnCity').onclick;
+  const ub = $('tiUpBld');
+  if (ub) ub.onclick = () => upgradeTileBuilding(selected);
+  const bb = $('tiBuildBtns');
+  if (bb) {
+    TILE_BLD_KEYS.forEach(k => {
+      const TB = TILE_BUILDINGS[k];
+      const cost = TB.cost(1);
+      let afford = true;
+      for (const rk in cost) if (state.res[rk] < cost[rk]) afford = false;
+      const b = document.createElement('button');
+      b.className = 'actbtn';
+      b.style.padding = '6px 8px';
+      b.disabled = !afford;
+      b.innerHTML = `${TB.em} ${TB.name} <small style="color:#d9b98a">— ${costStr(cost)}</small>`;
+      b.title = TB.desc(1);
+      b.onclick = () => buildTileBuilding(selected, k);
+      bb.appendChild(b);
+    });
+  }
+  const cl = $('tiCityList');
+  if (cl) {
+    Object.entries(BUILDINGS).forEach(([k, B]) => {
+      const lvl = bLevel(k);
+      const maxed = lvl >= B.max;
+      const gated = k !== 'capital' && lvl >= bLevel('capital');
+      const cost = maxed ? null : B.cost(lvl);
+      let afford = true;
+      if (cost) for (const rk in cost) if (state.res[rk] < cost[rk]) afford = false;
+      const row = document.createElement('div');
+      row.className = 'artrow';
+      row.innerHTML = `<canvas class="bicon" width="30" height="30" data-k="${k}" data-lvl="${lvl}"></canvas>
+        <span class="info"><b>${B.name} <span class="lvl-badge">Lv ${lvl}/${B.max}</span></b><br><small>${B.desc(Math.max(1, lvl))}</small></span>
+        <button class="actbtn" style="padding:6px 8px" ${maxed || gated || !afford ? 'disabled' : ''}>${maxed ? '✔ Tối đa' : gated ? '🔒 Chủ Thành' : '⬆️ ' + costStr(cost)}</button>`;
+      row.querySelector('button').onclick = () => { upgradeBuilding(k); renderTileInfo(); };
+      cl.appendChild(row);
+    });
+    cl.querySelectorAll('canvas.bicon').forEach(cv => drawBuildingIcon(cv.getContext('2d'), cv.dataset.k, parseInt(cv.dataset.lvl), 30));
+  }
   const ab = $('tiAttack');
   if (ab) ab.onclick = () => openAttack(selected);
   const rc = $('tiRecall');
@@ -1888,6 +1986,162 @@ function hash(x, y) {
   let h = (x * 374761393 + y * 668265263) | 0;
   h = (h ^ (h >> 13)) * 1274126177;
   return ((h ^ (h >> 16)) >>> 0) / 4294967295;
+}
+
+function drawBuildingIcon(g, key, lvl, S) {
+  g.imageSmoothingEnabled = false;
+  g.clearRect(0, 0, S, S);
+  const u = S / 30;
+  const pr = (x, y, w, h, c) => { g.fillStyle = c; g.fillRect(Math.round(x * u), Math.round(y * u), Math.ceil(w * u), Math.ceil(h * u)); };
+  const tri = (x1, y1, x2, y2, x3, y3, c) => { g.fillStyle = c; g.beginPath(); g.moveTo(x1 * u, y1 * u); g.lineTo(x2 * u, y2 * u); g.lineTo(x3 * u, y3 * u); g.fill(); };
+  const ink = '#1a120a';
+  const stone = '#8f8f8f', stoneL = '#a8a8a8', stoneD = '#6f6f6f';
+  const wood = '#8a6a3a', woodD = '#6b4a2a', woodL = '#a5824a';
+  const roofC = '#b03a2a', roofD = '#8a2a1e';
+  pr(3, 27, 24, 2, 'rgba(0,0,0,.25)');
+  if (key === 'capital') {
+    pr(7, 9, 16, 18, stone); pr(7, 9, 16, 2, stoneL);
+    for (let i = 0; i < 4; i++) pr(7 + i * 4.5, 6, 3, 4, stoneL);
+    pr(13, 19, 4, 8, woodD); pr(13, 19, 4, 1, woodL);
+    pr(9, 12, 3, 3, '#8ed0f0'); pr(18, 12, 3, 3, '#8ed0f0');
+    pr(14, 2, 1, 5, woodD);
+    tri(15, 2, 21, 4, 15, 6, '#c0392b');
+  } else if (key === 'barn') {
+    pr(6, 12, 18, 15, wood); pr(6, 12, 18, 2, woodL);
+    tri(5, 12, 15, 4, 25, 12, roofC); tri(5, 12, 15, 4, 15, 12, roofD);
+    pr(13, 18, 4, 9, woodD);
+    pr(8, 14, 3, 3, '#e8c86a'); pr(19, 14, 3, 3, '#e8c86a');
+  } else if (key === 'warehouse') {
+    pr(5, 13, 20, 14, woodD); pr(5, 13, 20, 2, woodL);
+    tri(4, 13, 15, 6, 26, 13, roofC);
+    pr(8, 16, 6, 5, wood); pr(16, 16, 6, 5, wood); pr(12, 21, 6, 5, wood);
+    pr(8, 16, 6, 1, woodL); pr(16, 16, 6, 1, woodL);
+  } else if (key === 'barracks') {
+    tri(4, 24, 15, 8, 26, 24, '#7a1f14'); tri(4, 24, 15, 8, 15, 24, '#9a3527');
+    pr(13, 18, 4, 6, ink);
+    pr(27, 10, 1, 14, woodD); pr(24, 10, 1, 14, woodD);
+    tri(27, 8, 29, 10, 27, 12, stoneL); tri(24, 8, 26, 10, 24, 12, stoneL);
+  } else if (key === 'range') {
+    pr(8, 22, 14, 2, woodD); pr(10, 24, 2, 4, woodD); pr(18, 24, 2, 4, woodD);
+    pr(9, 8, 12, 14, '#e8e0d0'); pr(11, 10, 8, 10, '#c0392b'); pr(13, 12, 4, 6, '#e8e0d0'); pr(14, 13, 2, 4, '#c0392b');
+    pr(23, 6, 1, 18, woodD); tri(23, 4, 27, 6, 23, 9, wood);
+  } else if (key === 'stable') {
+    pr(4, 16, 22, 2, woodD);
+    pr(5, 18, 2, 9, woodD); pr(12, 18, 2, 9, woodD); pr(19, 18, 2, 9, woodD); pr(24, 18, 2, 9, woodD);
+    pr(16, 8, 8, 6, '#6b4a2a'); pr(22, 10, 3, 4, '#6b4a2a'); pr(24, 11, 1, 1, ink);
+    pr(17, 6, 2, 2, '#4a3018');
+  } else {
+    pr(11, 6, 8, 21, stone); pr(11, 6, 8, 2, stoneL);
+    pr(11, 4, 8, 3, stoneL);
+    pr(13, 12, 4, 4, '#241505'); pr(13, 20, 4, 4, '#241505');
+    pr(9, 27, 12, 2, stoneD);
+  }
+  if (lvl >= 2) {
+    pr(26, 8, 1, 8, woodD);
+    tri(27, 8, 27 + 5, 10, 27, 12, '#ffd24a');
+  }
+  if (lvl >= 3) {
+    pr(4, 25, 22, 3, stoneD); pr(4, 25, 22, 1, stoneL);
+  }
+  if (lvl >= 4) {
+    pr(2, 12, 5, 13, stone); pr(2, 10, 5, 3, stoneL);
+    pr(3, 15, 3, 3, '#241505');
+  }
+  if (lvl >= 5) {
+    pr(3, 7, 24, 2, '#ffd24a');
+    pr(2, 9, 6, 2, '#ffd24a');
+  }
+}
+
+function drawTileBuilding(t, x, y, time) {
+  const lvl = t.b.lvl, k = t.b.k;
+  const ink = '#1a120a';
+  const wood = '#8a6a3a', woodD = '#6b4a2a', woodL = '#a5824a';
+  const stoneL = '#a8a8a8', stoneD = '#6f6f6f';
+  if (k === 'farm') {
+    px(x + 8, y + 22, 26, 12, '#8a6a3a');
+    for (let r = 0; r < 3; r++) px(x + 9, y + 24 + r * 4, 24, 1, '#6b4f2a');
+    for (let c = 0; c < 6; c++) {
+      const sway = Math.sin(time * 2 + c) * 1;
+      px(x + 10 + c * 4 + sway, y + 21, 2, 5, '#5aa832');
+      px(x + 9 + c * 4 + sway, y + 19, 3, 3, lvl >= 2 ? '#ffd24a' : '#9cc84a');
+    }
+    px(x + 26, y + 8, 9, 9, ink); px(x + 27, y + 9, 7, 7, wood); px(x + 27, y + 9, 7, 1, woodL);
+    if (lvl >= 2) {
+      px(x + 22, y + 4, 1, 7, woodD);
+      px(x + 23, y + 4, 5, 3, '#ffd24a');
+    }
+    if (lvl >= 3) {
+      px(x + 11, y + 6, 7, 2, stoneL); px(x + 13, y + 8, 3, 4, stoneD);
+      px(x + 11, y + 5, 7, 1, ink);
+    }
+  } else if (k === 'woodcamp') {
+    for (let i = 0; i < 2 + lvl; i++) {
+      const lx = x + 7 + (i % 3) * 8, ly = y + 14 + Math.floor(i / 3) * 4;
+      px(lx, ly, 7, 3, woodD); px(lx, ly, 7, 1, woodL);
+    }
+    px(x + 9, y + 25, 22, 8, ink); px(x + 10, y + 26, 20, 6, wood); px(x + 10, y + 26, 20, 1, woodL);
+    px(x + 29, y + 12, 6, 11, ink); px(x + 30, y + 13, 4, 9, '#7a828e');
+    if (lvl >= 2) {
+      px(x + 20, y + 4, 1, 8, woodD);
+      px(x + 21, y + 4, 5, 3, '#7ec850');
+    }
+    if (lvl >= 3) {
+      px(x + 4, y + 24, 4, 6, woodD); px(x + 4, y + 23, 4, 1, woodL);
+      px(x + 34, y + 24, 4, 6, woodD); px(x + 34, y + 23, 4, 1, woodL);
+    }
+  } else if (k === 'stonemine') {
+    px(x + 12, y + 12, 16, 20, ink);
+    px(x + 13, y + 13, 14, 18, '#7a7a7a');
+    px(x + 13, y + 13, 14, 2, stoneL);
+    px(x + 16, y + 19, 8, 12, '#241505');
+    px(x + 15, y + 17, 10, 2, woodD);
+    for (let i = 0; i < 1 + lvl; i++) {
+      px(x + 5 + (i % 3) * 5, y + 28 - Math.floor(i / 3) * 4, 4, 3, i % 2 ? '#8f8f8f' : '#7a7a7a');
+    }
+    if (lvl >= 2) {
+      px(x + 30, y + 8, 1, 14, woodD);
+      px(x + 31, y + 8, 5, 3, '#ffd24a');
+    }
+    if (lvl >= 3) {
+      px(x + 4, y + 10, 5, 8, ink); px(x + 5, y + 11, 3, 6, '#9a9aa2');
+    }
+  } else {
+    ctx.fillStyle = '#c8b89a';
+    ctx.beginPath();
+    ctx.moveTo(x + 20, y + 10);
+    ctx.lineTo(x + 10, y + 28);
+    ctx.lineTo(x + 30, y + 28);
+    ctx.fill();
+    ctx.fillStyle = '#a09070';
+    ctx.beginPath();
+    ctx.moveTo(x + 20, y + 10);
+    ctx.lineTo(x + 10, y + 28);
+    ctx.lineTo(x + 20, y + 28);
+    ctx.fill();
+    px(x + 18, y + 22, 4, 6, '#241505');
+    px(x + 19, y + 2, 1, 16, '#5a3a1e');
+    const wave = Math.sin(time * 4) * 2;
+    ctx.fillStyle = lvl >= 3 ? '#ffd24a' : '#c0392b';
+    ctx.beginPath();
+    ctx.moveTo(x + 20, y + 2);
+    ctx.lineTo(x + 29 + wave, y + 5);
+    ctx.lineTo(x + 20, y + 8);
+    ctx.fill();
+    if (lvl >= 2) {
+      ctx.fillStyle = '#c8b89a';
+      ctx.beginPath();
+      ctx.moveTo(x + 9, y + 16);
+      ctx.lineTo(x + 3, y + 28);
+      ctx.lineTo(x + 15, y + 28);
+      ctx.fill();
+    }
+    if (lvl >= 3) {
+      for (let i = 0; i < 8; i++) px(x + 5 + i * 4, y + 30, 2, 5, woodD);
+      px(x + 31, y + 24, 3, 3, '#ff8b2a');
+      px(x + 32, y + 22, 2, 2, '#ffd24a');
+    }
+  }
 }
 
 function drawTerrain(t) {
@@ -1964,6 +2218,27 @@ function drawTileContent(t) {
     const hpR = Math.max(0, state.fortressHp / maxFortHp());
     px(x + 6, y + 36, 28, 3, '#241505');
     px(x + 6, y + 36, 28 * hpR, 3, hpR > .5 ? '#7ec850' : hpR > .25 ? '#ffd24a' : '#e04a3a');
+    const cap = bLevel('capital');
+    if (cap >= 2) {
+      px(x + 1, y + 16, 4, 20, '#7a7a7a'); px(x + 1, y + 14, 4, 3, '#a8a8a8');
+      px(x + 35, y + 16, 4, 20, '#7a7a7a'); px(x + 35, y + 14, 4, 3, '#a8a8a8');
+    }
+    if (cap >= 3) {
+      px(x + 1, y + 34, 38, 3, '#6f6f6f'); px(x + 1, y + 34, 38, 1, '#8f8f8f');
+    }
+    if (cap >= 4) {
+      px(x + 14, y + 8, 12, 3, '#ffd24a'); px(x + 14, y + 8, 12, 1, '#ffe88a');
+    }
+    if (cap >= 5) {
+      px(x + 5, y - 6, 1, 8, '#5a3a1e');
+      const wave2 = Math.sin(time * 3) * 2;
+      ctx.fillStyle = '#ffd24a';
+      ctx.beginPath();
+      ctx.moveTo(x + 6, y - 6);
+      ctx.lineTo(x + 16 + wave2, y - 3);
+      ctx.lineTo(x + 6, y);
+      ctx.fill();
+    }
     if (t.owner === 'player') {
       const hk = activeHero();
       if (hk) drawHeroSprite(ctx, x + 30, y + 22, hk, time, 'idle');
@@ -1991,6 +2266,7 @@ function drawTileContent(t) {
       px(x + 29, y + 18, 2, 2, '#e04a3a');
     }
   }
+  if (t.owner === 'player' && t.b && t.type !== 'fortress') drawTileBuilding(t, x, y, time);
   if (t.owner === 'player' && t.type !== 'fortress') {
     const wave = Math.sin(time * 3 + t.y) * 1.5;
     px(x + 5, y + 4, 1, 10, '#3a2a1a');
