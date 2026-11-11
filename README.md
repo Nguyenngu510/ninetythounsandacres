@@ -13,6 +13,16 @@ Mở `index.html` bằng trình duyệt, hoặc bật GitHub Pages:
 
 Bản nông trại cũ vẫn còn ở `farm.html`.
 
+## 🎖️ Phiên bản 2 — Đồ họa & Hành quân
+
+- **Quân lính di chuyển thật**: bấm Hành Quân sẽ thấy đoàn lính 🔱🏹🐎 bước chân (có animation) từ lãnh thổ tới ô địch, kèm bụi đường; Kỵ Binh đi nhanh hơn bộ binh
+- **Quân cướp cũng hành quân**: khi còm báo động, thấy đoàn quân đỏ rượt từ trại cướp lao tới — trấn giữ ô hoặc về doanh phòng thành
+- **Xem bên trong từng ô**: click ô nào biết ô đó — chủ nhân là ai, quân cướp gì bao nhiêu, sức mạnh ~bao nhiêu, quân trấn giữ của mình, sản lượng, máu thành...
+- **Sprite quân lính pixel** vẽ tay: lính mác, cung thủ, kỵ binh ngựa; quân trấn giữ đứng gác trên ô, cờ hiệu phe phất theo gió
+- **Trấn giữ / Rút about**: thắng trận chọn ở lại trấn giữ ô (chống cướp) hoặc rút về doanh; ô trống quân sẽ bị cướp chiếm!
+- Chu kỳ ngày/đêm, lúa đuổi trong gió, đống lửa trại cướp, hiệu ứng bụi khi hành quân
+
+
 ## 🎯 Mục tiêu
 
 Chiếm các ô đất quanh chủ thành (mỗi ô = 1.000 mẫu) cho đến khi đạt **90.000 mẫu**. Quân cướp sẽ **đánh thành vào ban đêm** — hãy luôn giữ quân trong doanh!
