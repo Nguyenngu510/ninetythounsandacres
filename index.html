@@ -187,6 +187,13 @@
   #vsRow .side div { font-size: 12px; color: #d9b98a; }
   #vsRow .heroname { color: var(--gold); font-weight: bold; }
   #battleBtns { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+  #pvpBoard .prow { display: flex; justify-content: space-between; padding: 3px 8px; font-size: 12px; border-bottom: 1px solid #3a2814; }
+  #pvpBoard .prow.me { background: #3a2a10; color: var(--gold); font-weight: bold; }
+  .searchbox { font-size: 14px; font-weight: bold; color: var(--gold); }
+  .dots::after { content: ''; animation: dots 1.2s steps(4) infinite; }
+  @keyframes dots { 0% { content: ''; } 25% { content: '.'; } 50% { content: '..'; } 75% { content: '...'; } }
+  .foundbox { font-size: 13px; }
+  .foundtitle { color: var(--gold); font-weight: bold; font-size: 15px; margin-bottom: 6px; animation: pop .25s ease-out; }
   #toasts {
     position: fixed; top: 12px; left: 50%;
     transform: translateX(-50%);
@@ -240,6 +247,7 @@
     <button class="bigbtn" id="btnCity">🏛️ THÀNH PHỐ</button>
     <button class="bigbtn" id="btnArmy">⚔️ QUÂN ĐỘI</button>
     <button class="bigbtn" id="btnHero">🎖️ VÕ TƯỚNG</button>
+    <button class="bigbtn" id="btnPvp">🌐 ĐẤU TRƯỜNG</button>
     <button class="bigbtn" id="btnToken" title="Mua Lệnh Chinh Phạt bằng 25🪙">⚔️+ (25🪙)</button>
     <button class="bigbtn" id="btnHelp">❓</button>
   </div>
@@ -275,6 +283,25 @@
       Tướng mất máu khi chiến đấu, hồi 3❤️/giây khi nhàn rỗi; lộ 0❤️ thì bị thương nặng 2 phút.
     </p>
     <button class="closebtn" data-close="heroOverlay">ĐÓNG</button>
+  </div>
+</div>
+
+<div class="overlay" id="pvpOverlay">
+  <div class="panelbox">
+    <h2>🌐 ĐẤU TRƯỜNG — SẢNH CHỜ GHÉP TRẬN</h2>
+    <div style="display:flex;gap:10px;align-items:center;margin-bottom:8px;flex-wrap:wrap">
+      <label style="font-size:12px">Tên:</label>
+      <input id="pvpNick" maxlength="16" style="flex:1;min-width:140px;font-family:inherit;background:#241505;border:2px solid var(--panel-light);color:var(--text);padding:6px 8px;font-size:13px">
+      <span id="pvpStats" style="font-size:12px"></span>
+    </div>
+    <div id="pvpStatus" style="text-align:center;padding:10px;border:2px dashed var(--panel-light);margin-bottom:10px;min-height:52px"></div>
+    <h3 style="font-size:13px;color:var(--gold);margin-bottom:6px">🏆 BẢNG XẾP HẠNG DANH VỌNG</h3>
+    <div id="pvpBoard"></div>
+    <p style="font-size:11px;color:#d9b98a;margin-top:6px">
+      Đấu trường giao hữu: không mất quân, thắng thua đổi Điểm Danh Vọng (ELO).
+      Ghép trận miễn phí, nghỉ 30 giây giữa các trận.
+    </p>
+    <button class="closebtn" data-close="pvpOverlay">ĐÓNG</button>
   </div>
 </div>
 
@@ -438,6 +465,7 @@ function newGame() {
     buildings: { capital: 1, barn: 1, warehouse: 1, barracks: 1, range: 0, stable: 0, watchtower: 1 },
     army,
     hero: { owned: [], active: null, hp: {}, wounded: {} },
+    pvp: { nick: 'Lãnh Chúa' + (100 + Math.floor(Math.random() * 900)), rating: 1000, wins: 0, losses: 0, cd: 0, board: null },
     tiles,
     marches: [],
     particles: [],
@@ -462,6 +490,31 @@ try {
 if (!Array.isArray(state.marches)) state.marches = [];
 if (!Array.isArray(state.particles)) state.particles = [];
 if (!state.hero || !Array.isArray(state.hero.owned)) state.hero = { owned: [], active: null, hp: {}, wounded: {} };
+/* ================= ĐẤU TRƯỜNG: HẰNG SỐ (dùng khi khởi tạo state) ================= */
+const PVP_NAMES = ['Hắc Phong', 'Long Kiếm', 'Vũ Thần VN', 'Đại Gia Cỏ', 'Thợ Săn Mạc', 'Bão Tố',
+  'Kiếm Khách Đêm', 'Lão Tướng Quân', 'Hào Kiệt', 'Bạc Đầu', 'Ngạo Thiên', 'Huyết Thủ',
+  'Phong Vân', 'Băng Vương', 'Lôi Đình', 'Hỏa Kỳ Lân', 'U Linh', 'Thiết Bích',
+  'Độc Tôn', 'Thiên Mệnh', 'Bá Vương', 'Tinh Anh', 'Cao Thủ', 'Tân Binh'];
+
+function pvpTitle(r) {
+  return r < 900 ? '🥉 Đồng' : r < 1100 ? '🥈 Bạc' : r < 1300 ? '🥇 Vàng' : r < 1500 ? '💎 Bạch Kim' : r < 1700 ? '💠 Kim Cương' : '👑 Cao Thủ';
+}
+function genBoard() {
+  const used = {};
+  const board = [];
+  for (let i = 0; i < 12; i++) {
+    let n;
+    do { n = PVP_NAMES[Math.floor(Math.random() * PVP_NAMES.length)]; } while (used[n]);
+    used[n] = 1;
+    board.push({ name: n, rating: 850 + Math.floor(Math.random() * 500), bot: true });
+  }
+  return board;
+}
+
+if (!state.pvp || typeof state.pvp.rating !== 'number') {
+  state.pvp = { nick: 'Lãnh Chúa' + (100 + Math.floor(Math.random() * 900)), rating: 1000, wins: 0, losses: 0, cd: 0, board: null };
+}
+if (!Array.isArray(state.pvp.board) || !state.pvp.board.length) state.pvp.board = genBoard();
 function save() {
   try { localStorage.setItem(SAVE_KEY, JSON.stringify(state)); } catch (e) {}
 }
@@ -543,80 +596,89 @@ function heroCurHp(k) {
   return v === undefined || v === null ? HEROES[k].hp : v;
 }
 function applyHeroAfterBattle(result) {
-  if (!result.heroKey) return;
-  state.hero.hp[result.heroKey] = Math.max(0, result.heroHp);
-  if (result.heroHp <= 0) {
-    state.hero.wounded[result.heroKey] = state.time + 120;
-    toast(`🎖️ ${HEROES[result.heroKey].name} bị thương nặng — cần 2 phút hồi sức!`);
-  }
+  [result.heroA, result.heroB].forEach(h => {
+    if (!h || !h.player) return;
+    state.hero.hp[h.key] = Math.max(0, h.hp);
+    if (h.hp <= 0) {
+      state.hero.wounded[h.key] = state.time + 120;
+      toast(`🎖️ ${HEROES[h.key].name} bị thương nặng — cần 2 phút hồi sức!`);
+    }
+  });
 }
 
-function simulateBattle(atkIn, defIn, defMult, heroKey, heroSide, atkMult) {
+function heroSpec(spec, side) {
+  if (!spec || !spec.key || !HEROES[spec.key]) return null;
+  const H = HEROES[spec.key];
+  const hp = spec.hp !== undefined && spec.hp !== null ? spec.hp : heroCurHp(spec.key);
+  return { key: spec.key, H, hp, hp0: hp, player: !!spec.player, side };
+}
+
+function simulateBattle(atkIn, defIn, defMult, heroSpecA, heroSpecB, atkMult) {
   const atk = cloneArmy(atkIn), def = cloneArmy(defIn);
-  const hero = heroKey ? HEROES[heroKey] : null;
-  const side = heroSide || 'atk';
-  let heroHp = hero ? heroCurHp(heroKey) : 0;
-  const heroHp0 = heroHp;
+  const hA = heroSpec(heroSpecA, 'atk');
+  const hB = heroSpec(heroSpecB, 'def');
+  const atkMultV = atkMult || 1;
   const log = [];
-  let defDebuff = 1;
+  let debuffA = 1, debuffB = 1;
   let round = 0;
   while (round < 12 && !armyEmpty(atk) && !armyEmpty(def)) {
     round++;
-    let heroBoost = 1;
+    let boostA = 1, boostB = 1;
     let skillName = null;
-    if (hero && heroHp > 0 && hero.skill.round === round) {
-      skillName = hero.skill.name;
-      if (heroKey === 'guanyu') heroBoost = 2.2;
-      else if (heroKey === 'lubu') heroBoost = 2.0;
-      else if (heroKey === 'huangzhong') heroBoost = 1.8;
-      else if (heroKey === 'zhangfei') defDebuff = 0.75;
+    if (hA && hA.hp > 0 && hA.H.skill.round === round) {
+      skillName = hA.H.skill.name;
+      if (hA.key === 'guanyu') boostA = 2.2;
+      else if (hA.key === 'lubu') boostA = 2.0;
+      else if (hA.key === 'huangzhong') boostA = 1.8;
+      else if (hA.key === 'zhangfei') debuffB = 0.75;
     }
-    const heroAlive = hero && heroHp > 0;
-    const heroAtkAdd = heroAlive && side === 'atk' ? hero.atk : 0;
-    const heroDefAdd = heroAlive && side === 'def' ? hero.atk : 0;
-    let pAtk = (armyPower(atk, def, 1) + heroAtkAdd) * (atkMult || 1) * (0.85 + Math.random() * 0.3);
-    let pDef = (armyPower(def, atk, 1) + heroDefAdd) * defMult * defDebuff * (0.85 + Math.random() * 0.3);
-    if (heroAlive) {
-      if (side === 'atk') {
-        pAtk *= hero.mult;
-        if (hero.archerMult) {
-          pAtk += ((atk.archer || 0) * UNITS.archer.atk + (atk.crossbow || 0) * UNITS.crossbow.atk) * (hero.archerMult - 1);
-        }
-        if (hero.dmgTaken) pDef *= hero.dmgTaken;
-      } else {
-        pDef *= hero.mult;
-        if (hero.archerMult) {
-          pDef += ((def.archer || 0) * UNITS.archer.atk + (def.crossbow || 0) * UNITS.crossbow.atk) * (hero.archerMult - 1);
-        }
-        if (hero.dmgTaken) pAtk *= hero.dmgTaken;
-      }
-      pAtk *= heroBoost;
-      pDef *= heroBoost;
+    if (hB && hB.hp > 0 && hB.H.skill.round === round) {
+      skillName = hB.H.skill.name;
+      if (hB.key === 'guanyu') boostB = 2.2;
+      else if (hB.key === 'lubu') boostB = 2.0;
+      else if (hB.key === 'huangzhong') boostB = 1.8;
+      else if (hB.key === 'zhangfei') debuffA = 0.75;
+    }
+    const aAlive = hA && hA.hp > 0, bAlive = hB && hB.hp > 0;
+    let pAtk = (armyPower(atk, def, 1) + (aAlive ? hA.H.atk : 0)) * atkMultV * debuffA * (0.85 + Math.random() * 0.3);
+    let pDef = (armyPower(def, atk, 1) + (bAlive ? hB.H.atk : 0)) * defMult * debuffB * (0.85 + Math.random() * 0.3);
+    if (aAlive) {
+      pAtk *= hA.H.mult;
+      if (hA.H.archerMult) pAtk += ((atk.archer || 0) * UNITS.archer.atk + (atk.crossbow || 0) * UNITS.crossbow.atk) * (hA.H.archerMult - 1);
+      if (hA.H.dmgTaken) pDef *= hA.H.dmgTaken;
+      pAtk *= boostA;
+    }
+    if (bAlive) {
+      pDef *= hB.H.mult;
+      if (hB.H.archerMult) pDef += ((def.archer || 0) * UNITS.archer.atk + (def.crossbow || 0) * UNITS.crossbow.atk) * (hB.H.archerMult - 1);
+      if (hB.H.dmgTaken) pAtk *= hB.H.dmgTaken;
+      pDef *= boostB;
     }
     applyCasualties(def, pAtk);
     applyCasualties(atk, pDef);
-    if (heroAlive && heroKey === 'zhaoyun' && hero.skill.round === round) {
-      const src = side === 'atk' ? atkIn : defIn;
-      const cur = side === 'atk' ? atk : def;
-      UNIT_KEYS.forEach(k => {
-        const init = src[k] || 0;
-        if (init > 0) cur[k] = Math.min(init, (cur[k] || 0) + Math.round(init * 0.15));
-      });
+    if (aAlive && hA.key === 'zhaoyun' && hA.H.skill.round === round) {
+      UNIT_KEYS.forEach(k => { const init = atkIn[k] || 0; if (init > 0) atk[k] = Math.min(init, (atk[k] || 0) + Math.round(init * 0.15)); });
     }
-    if (heroAlive) {
-      heroHp = Math.max(0, heroHp - (side === 'atk' ? pDef : pAtk) * 0.08);
+    if (bAlive && hB.key === 'zhaoyun' && hB.H.skill.round === round) {
+      UNIT_KEYS.forEach(k => { const init = defIn[k] || 0; if (init > 0) def[k] = Math.min(init, (def[k] || 0) + Math.round(init * 0.15)); });
     }
+    if (aAlive) hA.hp = Math.max(0, hA.hp - pDef * 0.08);
+    if (bAlive) hB.hp = Math.max(0, hB.hp - pAtk * 0.08);
     log.push({
       round, pAtk: Math.round(pAtk), pDef: Math.round(pDef),
       atkSnap: cloneArmy(atk), defSnap: cloneArmy(def),
-      heroHp: Math.round(heroHp),
-      heroFallen: heroAlive && heroHp <= 0,
+      heroHpA: Math.round(aAlive ? hA.hp : 0), heroHpB: Math.round(bAlive ? hB.hp : 0),
+      heroFallenA: aAlive && hA.hp <= 0, heroFallenB: bAlive && hB.hp <= 0,
       skill: skillName,
     });
   }
   const atkHp = armyHp(atk), defHp = armyHp(def);
   const win = !armyEmpty(atk) && (armyEmpty(def) || atkHp >= defHp);
-  return { win, atk, def, log, heroKey: heroKey || null, heroSide: side, heroHp: Math.round(heroHp), heroHp0: Math.round(heroHp0) };
+  return {
+    win, atk, def, log,
+    heroA: hA ? { key: hA.key, hp: Math.round(hA.hp), hp0: Math.round(hA.hp0), player: hA.player } : null,
+    heroB: hB ? { key: hB.key, hp: Math.round(hB.hp), hp0: Math.round(hB.hp0), player: hB.player } : null,
+  };
 }
 
 function prodRates() {
@@ -695,7 +757,7 @@ function resolveMarch(m) {
   }
   if (m.kind === 'attack') {
     const hk = m.heroKey && activeHero() === m.heroKey ? m.heroKey : null;
-    const result = simulateBattle(m.comp, target.g, 1, hk, 'atk', atkBonus());
+    const result = simulateBattle(m.comp, target.g, 1, hk ? { key: hk, player: true } : null, null, atkBonus());
     showBattle('Quân viễn chinh' + (hk ? ` 🎖️${HEROES[hk].name}` : ''),
       `Cướp ô ${TILE_INFO[target.type].em} lv${target.level}`,
       m.comp, target.g, result, {
@@ -730,7 +792,7 @@ function resolveMarch(m) {
   if (m.kind === 'raid') {
     if (target.type === 'fortress') {
       const hk = activeHero();
-      const result = simulateBattle(m.comp, state.army, defBonus(), hk, 'def', 1);
+      const result = simulateBattle(m.comp, state.army, defBonus(), null, hk ? { key: hk, player: true } : null, 1);
       showBattle(`Quân cướp (ngày ${dayNum()})`, 'Quân phòng thành' + (hk ? ` 🎖️${HEROES[hk].name}` : ''),
         m.comp, state.army, result, {
           hideChoices: true,
@@ -974,7 +1036,7 @@ function drawBattleSide(side, L, lunge, dt) {
   const time = performance.now() / 1000;
   sprites.forEach(s => {
     let count = s.count0;
-    if (L) count = s.isHero ? (L.heroHp > 0 ? 1 : 0) : (snap[s.kind] || 0);
+    if (L) count = s.isHero ? ((isLeft ? L.heroHpA : L.heroHpB) > 0 ? 1 : 0) : (snap[s.kind] || 0);
     if (count <= 0 && s.count0 > 0 && !s.dead) {
       s.dead = true;
       s.deadT = 0;
@@ -1003,7 +1065,7 @@ function drawBattleSide(side, L, lunge, dt) {
     else drawSoldier(bctx, 0, 0, s.kind, team, time + s.hx * 0.1, lunge > 0.05 && !ranged, lunge > 0.4 ? 'attack' : 'idle');
     bctx.restore();
     if (s.isHero) {
-      const hpR = L ? Math.max(0, L.heroHp) / bAnim.heroHp0 : 1;
+      const hpR = L ? Math.max(0, isLeft ? L.heroHpA : L.heroHpB) / (isLeft ? bAnim.heroHp0A : bAnim.heroHp0B) : 1;
       bctx.fillStyle = '#241505';
       bctx.fillRect(x - 11, s.hy + 5, 22, 3);
       bctx.fillStyle = '#ffd24a';
@@ -1056,7 +1118,7 @@ function spawnImpact() {
     bAnim.fx.push({ type: 'txt', txt: '⚔ ' + L.skill + '!', x: 230, y: 30, vy: -8, life: 1.4, color: '#ffd24a', size: 15 });
     bAnim.flash = 0.4;
   }
-  if (L.heroFallen) {
+  if (L.heroFallenA || L.heroFallenB) {
     bAnim.fx.push({ type: 'txt', txt: '💀 Võ tướng ngã xuống!', x: 230, y: 96, vy: -8, life: 1.6, color: '#ff5a4a', size: 12 });
   }
   for (let i = 0; i < 10; i++) {
@@ -1163,13 +1225,14 @@ function showBattle(nameA, nameB, compA, compB, result, opts) {
     battleQueue.push([nameA, nameB, compA, compB, result, opts]);
     return;
   }
-  const heroA = result.heroKey && result.heroSide === 'atk' ? result.heroKey : null;
-  const heroB = result.heroKey && result.heroSide === 'def' ? result.heroKey : null;
+  const heroA = result.heroA ? result.heroA.key : null;
+  const heroB = result.heroB ? result.heroB.key : null;
   bAnim = {
     spritesA: sideSprites(compA, heroA, true),
     spritesB: sideSprites(compB, heroB, false),
     fx: [], shake: 0, flash: 0, tRound: 0, L: null,
-    heroHp0: Math.max(1, result.heroHp0 || 1),
+    heroHp0A: Math.max(1, result.heroA ? result.heroA.hp0 : 1),
+    heroHp0B: Math.max(1, result.heroB ? result.heroB.hp0 : 1),
   };
   const logBox = $('battleLog');
   logBox.innerHTML = '';
@@ -1252,6 +1315,130 @@ function showBattle(nameA, nameB, compA, compB, result, opts) {
   setTimeout(step, 400);
 }
 
+
+/* ================= ĐẤU TRƯỜNG (SẢNH CHỜ GHÉP TRẬN) ================= */
+let pvpSearching = false;
+let pvpSearchTick = null;
+let pvpOpponent = null;
+
+function renderPvp() {
+  const p = state.pvp;
+  const nick = $('pvpNick');
+  nick.value = p.nick;
+  nick.onchange = () => {
+    p.nick = nick.value.trim().slice(0, 16) || p.nick;
+    save();
+  };
+  $('pvpStats').innerHTML = `🏆 <b>${p.rating}</b> (${pvpTitle(p.rating)}) · ✅ ${p.wins} thắng · ❌ ${p.losses} thua`;
+  const board = [...p.board, { name: p.nick + ' (Bạn)', rating: p.rating, me: true }].sort((a, b) => b.rating - a.rating);
+  $('pvpBoard').innerHTML = board.map((e, i) =>
+    `<div class="prow${e.me ? ' me' : ''}"><span>#${i + 1} ${e.name}</span><b>${e.rating}</b></div>`).join('');
+  renderPvpStatus();
+}
+
+function renderPvpStatus() {
+  const el = $('pvpStatus');
+  if (pvpOpponent) {
+    const o = pvpOpponent;
+    el.innerHTML = `<div class="foundbox">
+      <div class="foundtitle">⚔️ TÌM THẤY ĐỐI THỦ!</div>
+      <div><b>${o.nick}</b> — 🏆 ${o.rating} (${pvpTitle(o.rating)})</div>
+      <div class="uline" style="justify-content:center;margin:6px 0">${unitChips(o.army)}</div>
+      ${o.heroKey ? `<div>🎖️ Võ tướng: <b style="color:var(--gold)">${HEROES[o.heroKey].name}</b></div>` : '<div>Không có võ tướng</div>'}
+      <button class="actbtn red" id="btnFight" style="font-size:14px;padding:10px 22px;margin-top:8px">⚔️ VÀO TRẬN!</button>
+    </div>`;
+    $('btnFight').onclick = () => startPvpBattle(o);
+    return;
+  }
+  if (pvpSearching) {
+    el.innerHTML = `<div class="searchbox">🔍 Đang tìm đối thủ<span class="dots"></span><br><small id="pvpTimer"></small></div>`;
+    return;
+  }
+  const cd = Math.ceil((state.pvp.cd || 0) - state.time);
+  el.innerHTML = `<button class="actbtn red" id="btnFindMatch" style="font-size:14px;padding:10px 22px" ${cd > 0 ? 'disabled' : ''}>🔍 TÌM TRẬN${cd > 0 ? ' (chờ ' + cd + 's)' : ''}</button>
+    <div style="margin-top:6px"><small>🟢 <b id="pvpOnline"></b> người đang online</small></div>`;
+  $('btnFindMatch').onclick = findMatch;
+  const onl = $('pvpOnline');
+  if (onl) onl.textContent = (900 + Math.floor(Math.random() * 1500)).toLocaleString('vi-VN');
+}
+
+function findMatch() {
+  if (pvpSearching || pvpOpponent) return;
+  if (armyEmpty(state.army)) { toast('Không có quân trong doanh! Tuyển quân trước đã.'); return; }
+  const cd = Math.ceil((state.pvp.cd || 0) - state.time);
+  if (cd > 0) { toast('⏳ Vui lòng chờ ' + cd + 's nữa rồi ghép trận tiếp'); return; }
+  pvpSearching = true;
+  renderPvpStatus();
+  const started = Date.now();
+  pvpSearchTick = setInterval(() => {
+    const t = $('pvpTimer');
+    if (t) t.textContent = '🟢 ' + (900 + Math.floor(Math.random() * 1500)).toLocaleString('vi-VN') +
+      ' online · ' + ((Date.now() - started) / 1000).toFixed(0) + 's';
+  }, 500);
+  setTimeout(() => {
+    clearInterval(pvpSearchTick);
+    if (!pvpSearching) return;
+    pvpSearching = false;
+    foundOpponent();
+  }, 2000 + Math.random() * 3000);
+}
+
+function genOppArmy(oppRating, myRating) {
+  const factor = Math.min(1.15, Math.max(0.85, Math.pow(10, (oppRating - myRating) / 9300)));
+  const f = emptyArmy();
+  let any = false;
+  UNIT_KEYS.forEach(k => {
+    const base = state.army[k] || 0;
+    if (base <= 0) return;
+    const c = Math.round(base * factor * (0.92 + Math.random() * 0.16));
+    if (c > 0) { f[k] = c; any = true; }
+  });
+  if (!any) f.spear = 5;
+  return f;
+}
+
+function foundOpponent() {
+  const p = state.pvp;
+  const nick = PVP_NAMES[Math.floor(Math.random() * PVP_NAMES.length)] + Math.floor(Math.random() * 90 + 10);
+  const rating = Math.max(100, p.rating + Math.floor(Math.random() * 160 - 80));
+  const army = genOppArmy(rating, p.rating);
+  const heroKey = Math.random() < 0.35 ? HERO_KEYS[Math.floor(Math.random() * HERO_KEYS.length)] : null;
+  pvpOpponent = { nick, rating, army, heroKey, heroHp: heroKey ? HEROES[heroKey].hp : 0 };
+  renderPvpStatus();
+}
+
+function startPvpBattle(opp) {
+  pvpOpponent = null;
+  const hk = activeHero();
+  const result = simulateBattle(state.army, opp.army, 1,
+    hk ? { key: hk, player: true } : null,
+    opp.heroKey ? { key: opp.heroKey, hp: opp.heroHp } : null,
+    atkBonus());
+  showBattle(`${state.pvp.nick} (Bạn)`, `${opp.nick} (${pvpTitle(opp.rating)})`, state.army, opp.army, result, {
+    hideChoices: true,
+    onEnd: () => {
+      const p = state.pvp;
+      const expected = 1 / (1 + Math.pow(10, (opp.rating - p.rating) / 400));
+      const delta = Math.round(32 * ((result.win ? 1 : 0) - expected));
+      p.rating = Math.max(100, p.rating + delta);
+      if (result.win) {
+        p.wins++;
+        const loot = 20 + Math.floor(Math.random() * 30) + Math.floor(opp.rating / 50);
+        state.res.gold += loot;
+        toast(`🏆 Thắng ${opp.nick}! +${delta} điểm, cướp được ${loot}🪙`);
+      } else {
+        p.losses++;
+        toast(`💀 Thua ${opp.nick}... ${delta} điểm`);
+      }
+      p.board.forEach(e => { e.rating = Math.max(100, e.rating + Math.floor(Math.random() * 60 - 30)); });
+      p.cd = state.time + 30;
+      applyHeroAfterBattle(result);
+      updateHUD(); save();
+      if ($('pvpOverlay').classList.contains('open')) renderPvp();
+    }
+  });
+}
+
 /* ================= QUÂN CƯỚP ĐÁNH ĐÊM ================= */
 function makeRaidForce(target) {
   const day = dayNum();
@@ -1317,6 +1504,7 @@ document.querySelectorAll('[data-close]').forEach(b => {
 $('btnCity').onclick = () => { renderCity(); $('cityOverlay').classList.add('open'); };
 $('btnArmy').onclick = () => { renderArmy(); $('armyOverlay').classList.add('open'); };
 $('btnHero').onclick = () => { renderHeroPanel(); $('heroOverlay').classList.add('open'); };
+$('btnPvp').onclick = () => { renderPvp(); $('pvpOverlay').classList.add('open'); };
 $('btnToken').onclick = () => {
   if (state.res.gold < 25 || state.tokens >= 5) return;
   state.res.gold -= 25; state.tokens++;
@@ -1328,6 +1516,7 @@ $('btnHelp').onclick = () => {
   setTimeout(() => toast('⚔️ Chọn ô kề lãnh thổ → Hành quân → Thắng thì chọn Trấn giữ hoặc Rút về'), 1000);
   setTimeout(() => toast('🎖️ Tuyển Võ Tướng để nhận nội tại + kỹ năng mạnh trong trận!'), 2000);
   setTimeout(() => toast('🚨 Quân cướp cũng HÀNH QUÂN ra đánh — trấn giữ ô hoặc về doanh phòng thủ!'), 3000);
+  setTimeout(() => toast('🌐 ĐẤU TRƯỜNG: vào sảnh chờ ghép trận PVP, leo bảng Danh Vọng!'), 4000);
 };
 addEventListener('keydown', e => {
   if (e.key === 'Escape') {
@@ -1337,6 +1526,7 @@ addEventListener('keydown', e => {
   if (e.key === 'c' || e.key === 'C') { renderCity(); $('cityOverlay').classList.add('open'); }
   if (e.key === 'a' || e.key === 'A') { renderArmy(); $('armyOverlay').classList.add('open'); }
   if (e.key === 'h' || e.key === 'H') { renderHeroPanel(); $('heroOverlay').classList.add('open'); }
+  if (e.key === 'p' || e.key === 'P') { renderPvp(); $('pvpOverlay').classList.add('open'); }
 });
 
 function renderHeroPanel() {

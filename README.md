@@ -60,6 +60,20 @@ Khi hai quân giao tranh, một **chiến trường pixel** hiện ra ngay trong
 - Thắng trận chọn **🚩 Ở lại trấn giữ** hoặc **🏠 Rút về doanh**; ô trống quân sẽ bị cướp chiếm
 - Chu kỳ ngày/đêm, cờ phất, lúa đuổi trong gió
 
+## 🌐 Đấu Trường — Sảnh chờ ghép trận (mới)
+
+Mở 🌐 **ĐẤU TRƯỜNG** (phím `P`) để vào sảnh chờ ghép trận PVP:
+
+- **Đặt nickname** Lãnh Chúa, xem điểm **Danh Vọng** (ELO, khởi đầu 1000) và thắng/thua
+- Bấm **🔍 TÌM TRẬN** — sảnh chờ hiển thị số người online, ghép đối thủ trong 2–5 giây
+- Thấy trước **quân đội + Võ Tướng** của đối thủ rồi mới bấm ⚔️ **VÀO TRẬN!**
+- Đối thủ có quân tương đương trình (nhân bản cấu trúc quân của bạn theo chênh lệch điểm), 35% mang võ tướng riêng — trận đấu có kỹ năng cả 2 bên
+- Thắng: **+Danh Vọng** (ELO K=32) + cướp 💰 vàng. Thua: trừ điểm. Cooldown 30s giữa các trận
+- **Bảng xếp hạng** 12 chiến binh theo danh vọng, chia bậc: 🥉 Đồng → 🥈 Bạc → 🥇 Vàng → 💎 Bạch Kim → 💠 Kim Cương → 👑 Cao Thủ
+- Trận PVP **không mất quân thật** — giao hữu thuần túy, chỉ tính điểm
+
+> 💡 Lưu ý: GitHub Pages là hosting tĩnh nên đối thủ là **người chơi mô phỏng** (AI cùng trải nghiệm sảnh chờ). Chơi online người-thật-với-người-thật cần server backend riêng.
+
 ## 🎯 Mục tiêu
 
 Chiếm các ô đất quanh chủ thành (mỗi ô = 1.000 mẫu) cho đến khi đạt **90.000 mẫu**. Quân cướp sẽ **đánh thành vào ban đêm** — hãy luôn giữ quân trong doanh!
@@ -89,5 +103,5 @@ Chiếm các ô đất quanh chủ thành (mỗi ô = 1.000 mẫu) cho đến kh
 
 ## ⌨️ Phím tắt
 
-- `C` — Thành phố · `A` — Quân đội · `H` — Võ Tướng · `Esc` — đóng bảng
+- `C` — Thành phố · `A` — Quân đội · `H` — Võ Tướng · `P` — Đấu Trường · `Esc` — đóng bảng
 - Tiến trình tự lưu vào trình duyệt (localStorage)
