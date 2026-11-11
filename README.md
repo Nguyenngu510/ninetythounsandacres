@@ -60,7 +60,19 @@ Khi hai quân giao tranh, một **chiến trường pixel** hiện ra ngay trong
 - Thắng trận chọn **🚩 Ở lại trấn giữ** hoặc **🏠 Rút về doanh**; ô trống quân sẽ bị cướp chiếm
 - Chu kỳ ngày/đêm, cờ phất, lúa đuổi trong gió
 
-## 🌐 Đấu Trường — Sảnh chờ ghép trận (mới)
+## 🎨 Tuỳ biến đồ hoạ (mới)
+
+Game có **2 lớp đồ hoạ**: pixel art mặc định (vẽ bằng code, có sẵn) và **ảnh tuỳ biến của bạn** — ưu tiên ảnh tuỳ biến nếu có:
+
+- Mở 🎨 **HÌNH ẢNH** (phím `I`) → upload PNG trong suốt cho **từng quân lính** (6 loại) và **từng võ tướng** (5 tướng)
+- Ảnh lưu tự động vào trình duyệt (localStorage), áp dụng ngay vào: chiến trường trận đấu, bản đồ hành quân, xác ngã, và bảng xem trước
+- Khuyến nghị: PNG nền trong suốt, **32×32 hoặc 64×64**, nhân vật hướng mặt **sang phải**; ảnh to hơn sẽ được co về kích thước sprite (quân 16×18, tượng 26×22, tướng 20×26)
+- Bấm ↺ để trả về pixel art mặc định cho từng nhân vật
+- Cách thứ 2 cho lập trình viên: sửa khối `globalThis.GAME_ART` ở đầu `<script>` trong `index.html`, điền URL hoặc dataURL — phù hợp khi bạn muốn đóng gói sẵn bộ ảnh của riêng mình
+
+Pixel art mặc định cũng đã nâng cấp: viền tối, bóng đổ, giáp 2 lớp, mũ sắt có lông cờ, vũ khí kim loại có điểm sáng — kỵ binh cưỡi ngựa đầy đủ, tượng binh có kiệu trên lưng.
+
+## 🌐 Đấu Trường — Sảnh chờ ghép trận
 
 Mở 🌐 **ĐẤU TRƯỜNG** (phím `P`) để vào sảnh chờ ghép trận PVP:
 
@@ -103,5 +115,5 @@ Chiếm các ô đất quanh chủ thành (mỗi ô = 1.000 mẫu) cho đến kh
 
 ## ⌨️ Phím tắt
 
-- `C` — Thành phố · `A` — Quân đội · `H` — Võ Tướng · `P` — Đấu Trường · `Esc` — đóng bảng
+- `C` — Thành phố · `A` — Quân đội · `H` — Võ Tướng · `P` — Đấu Trường · `I` — Hình ảnh · `Esc` — đóng bảng
 - Tiến trình tự lưu vào trình duyệt (localStorage)

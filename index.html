@@ -193,6 +193,10 @@
   .dots::after { content: ''; animation: dots 1.2s steps(4) infinite; }
   @keyframes dots { 0% { content: ''; } 25% { content: '.'; } 50% { content: '..'; } 75% { content: '...'; } }
   .foundbox { font-size: 13px; }
+  .artrow { display: flex; align-items: center; gap: 8px; padding: 5px 4px; border-bottom: 1px solid #3a2814; }
+  .artrow .info { flex: 1; font-size: 12px; }
+  .artrow .info small { color: #d9b98a; }
+  canvas.artprev { width: 40px; height: 40px; background: #241505; border: 2px solid var(--panel-light); image-rendering: pixelated; }
   .foundtitle { color: var(--gold); font-weight: bold; font-size: 15px; margin-bottom: 6px; animation: pop .25s ease-out; }
   #toasts {
     position: fixed; top: 12px; left: 50%;
@@ -248,6 +252,7 @@
     <button class="bigbtn" id="btnArmy">⚔️ QUÂN ĐỘI</button>
     <button class="bigbtn" id="btnHero">🎖️ VÕ TƯỚNG</button>
     <button class="bigbtn" id="btnPvp">🌐 ĐẤU TRƯỜNG</button>
+    <button class="bigbtn" id="btnArt">🎨 HÌNH ẢNH</button>
     <button class="bigbtn" id="btnToken" title="Mua Lệnh Chinh Phạt bằng 25🪙">⚔️+ (25🪙)</button>
     <button class="bigbtn" id="btnHelp">❓</button>
   </div>
@@ -302,6 +307,19 @@
       Ghép trận miễn phí, nghỉ 30 giây giữa các trận.
     </p>
     <button class="closebtn" data-close="pvpOverlay">ĐÓNG</button>
+  </div>
+</div>
+
+<div class="overlay" id="artOverlay">
+  <div class="panelbox" style="max-width:520px">
+    <h2>🎨 TUỲ BIẾN ĐỒ HOẠ</h2>
+    <p style="font-size:11px;color:#d9b98a;margin:2px 0 8px">
+      Upload ảnh PNG trong suốt cho từng quân lính / võ tướng (khuyến nghị 32×32 hoặc 64×64,
+      nhân vật hướng mặt sang phải). Ảnh lưu tự động trên máy bạn và áp dụng ngay vào
+      chiến trường trận đấu, bản đồ hành quân. Không upload thì dùng pixel art mặc định.
+    </p>
+    <div id="artGrid"></div>
+    <button class="closebtn" data-close="artOverlay">ĐÓNG</button>
   </div>
 </div>
 
@@ -417,6 +435,55 @@ const TILE_INFO = {
 };
 
 const SAVE_KEY = 'chin-van-mau-strategy-v3';
+
+/* ================= TUỲ BIẾN ĐỒ HOẠ (đổi ảnh quân lính & võ tướng) =================
+   Cách 1 — sửa code: điền URL hoặc dataURL ảnh PNG trong suốt vào bên dưới
+   (khuyến nghị 32×32 hoặc 64×64, nhân vật hướng mặt sang phải, nền trong suốt).
+   Cách 2 — trong game: bấm 🎨 HÌNH ẢNH (phím I) để upload ảnh từ máy,
+   ảnh được lưu tự động vào trình duyệt (localStorage). */
+globalThis.GAME_ART = {
+  units: { spear: null, shield: null, archer: null, crossbow: null, cav: null, elephant: null },
+  heroes: { guanyu: null, zhangfei: null, zhaoyun: null, huangzhong: null, lubu: null },
+};
+const ART_STORE_KEY = 'chin-van-mau-art';
+const ART = { units: {}, heroes: {} };
+function loadArtStore() {
+  try { return JSON.parse(localStorage.getItem(ART_STORE_KEY)) || {}; } catch (e) { return {}; }
+}
+function artSrc(type, key) {
+  const store = loadArtStore();
+  return (store[type] && store[type][key]) || (globalThis.GAME_ART[type] && globalThis.GAME_ART[type][key]) || null;
+}
+function setArtSrc(type, key, src2) {
+  const store = loadArtStore();
+  store[type] = store[type] || {};
+  if (src2) store[type][key] = src2; else delete store[type][key];
+  try { localStorage.setItem(ART_STORE_KEY, JSON.stringify(store)); } catch (e) {}
+  loadArtImage(type, key);
+  renderArtPanel();
+}
+function loadArtImage(type, key) {
+  const s = artSrc(type, key);
+  if (!s || typeof Image === 'undefined') { delete ART[type][key]; return; }
+  const img = new Image();
+  img.onload = () => { img.artOk = true; };
+  img.onerror = () => { img.artOk = false; };
+  img.src = s;
+  ART[type][key] = img;
+}
+Object.keys(globalThis.GAME_ART).forEach(t2 => Object.keys(globalThis.GAME_ART[t2]).forEach(k2 => loadArtImage(t2, k2)));
+
+function drawArtSprite(g, type, key, x, y, w, h, team) {
+  const img = ART[type] && ART[type][key];
+  if (!img || !img.artOk || !img.complete || !img.naturalWidth) return false;
+  g.imageSmoothingEnabled = false;
+  g.drawImage(img, x - w / 2, y - h, w, h);
+  if (team) {
+    g.fillStyle = team === 'player' ? '#7ec850' : '#e04a3a';
+    g.fillRect(x - 4, y - 1, 8, 2);
+  }
+  return true;
+}
 
 function emptyArmy() { const o = {}; UNIT_KEYS.forEach(k => o[k] = 0); return o; }
 
@@ -1505,6 +1572,53 @@ $('btnCity').onclick = () => { renderCity(); $('cityOverlay').classList.add('ope
 $('btnArmy').onclick = () => { renderArmy(); $('armyOverlay').classList.add('open'); };
 $('btnHero').onclick = () => { renderHeroPanel(); $('heroOverlay').classList.add('open'); };
 $('btnPvp').onclick = () => { renderPvp(); $('pvpOverlay').classList.add('open'); };
+$('btnArt').onclick = () => { renderArtPanel(); $('artOverlay').classList.add('open'); };
+
+function renderArtPanel() {
+  const grid = $('artGrid');
+  if (!grid) return;
+  const rows = [];
+  const section = (title, type, keys) => {
+    rows.push(`<div style="font-weight:bold;color:var(--gold);margin:8px 0 2px;font-size:12px">${title}</div>`);
+    keys.forEach(k => {
+      const name = type === 'units' ? `${UNITS[k].em} ${UNITS[k].name}` : `🎖️ ${HEROES[k].name}`;
+      const has = !!artSrc(type, k);
+      rows.push(`<div class="artrow">
+        <canvas class="artprev" width="40" height="40" data-type="${type}" data-k="${k}"></canvas>
+        <span class="info"><b>${name}</b><br><small>${has ? '✅ Ảnh tuỳ biến' : 'Pixel art mặc định'}</small></span>
+        <button class="actbtn blue artup" data-type="${type}" data-k="${k}">📂 Chọn ảnh</button>
+        ${has ? `<button class="closebtn artreset" data-type="${type}" data-k="${k}" style="padding:6px 10px">↺</button>` : ''}
+      </div>`);
+    });
+  };
+  section('QUÂN LÍNH', 'units', UNIT_KEYS);
+  section('VÕ TƯỚNG', 'heroes', HERO_KEYS);
+  grid.innerHTML = rows.join('');
+  grid.querySelectorAll('canvas.artprev').forEach(cv => {
+    const type = cv.dataset.type, k = cv.dataset.k;
+    const g = cv.getContext('2d');
+    g.imageSmoothingEnabled = false;
+    const img = ART[type][k];
+    if (img && img.artOk && img.complete) g.drawImage(img, 4, 4, 32, 32);
+    else if (type === 'units') { g.save(); g.scale(2, 2); drawSoldier(g, 10, 18, k, 'player', 0, false, 'idle'); g.restore(); }
+    else { g.save(); g.scale(2, 2); drawHeroSprite(g, 10, 18, k, 0, 'idle'); g.restore(); }
+  });
+  grid.querySelectorAll('.artup').forEach(b => { b.onclick = () => pickArtFile(b.dataset.type, b.dataset.k); });
+  grid.querySelectorAll('.artreset').forEach(b => { b.onclick = () => setArtSrc(b.dataset.type, b.dataset.k, null); });
+}
+function pickArtFile(type, key) {
+  const inp = document.createElement('input');
+  inp.type = 'file';
+  inp.accept = 'image/png,image/*';
+  inp.onchange = () => {
+    const f = inp.files && inp.files[0];
+    if (!f) return;
+    const rd = new FileReader();
+    rd.onload = () => setArtSrc(type, key, String(rd.result));
+    rd.readAsDataURL(f);
+  };
+  inp.click();
+}
 $('btnToken').onclick = () => {
   if (state.res.gold < 25 || state.tokens >= 5) return;
   state.res.gold -= 25; state.tokens++;
@@ -1527,6 +1641,7 @@ addEventListener('keydown', e => {
   if (e.key === 'a' || e.key === 'A') { renderArmy(); $('armyOverlay').classList.add('open'); }
   if (e.key === 'h' || e.key === 'H') { renderHeroPanel(); $('heroOverlay').classList.add('open'); }
   if (e.key === 'p' || e.key === 'P') { renderPvp(); $('pvpOverlay').classList.add('open'); }
+  if (e.key === 'i' || e.key === 'I') { renderArtPanel(); $('artOverlay').classList.add('open'); }
 });
 
 function renderHeroPanel() {
@@ -1889,91 +2004,180 @@ function drawTileContent(t) {
 }
 
 function drawSoldier(g, x, y, kind, team, t, moving, pose) {
-  const cMain = team === 'player' ? '#3f7a2e' : '#7a1f14';
-  const cDark = team === 'player' ? '#2a5a1e' : '#57110a';
+  if (drawArtSprite(g, 'units', kind, x, y, kind === 'elephant' ? 26 : 16, kind === 'elephant' ? 22 : 18, team)) return;
+  const P = team === 'player';
+  const cMain = P ? '#3f7a2e' : '#7a1f14';
+  const cDark = P ? '#2a5a1e' : '#57110a';
+  const cLite = P ? '#5a9a44' : '#9a3527';
   const cSkin = '#e8b88a';
+  const cSkinD = '#c99566';
+  const metal = '#b8c0cc', metalD = '#7a828e', metalL = '#eef2f6';
+  const ink = '#1a120a';
   const step = moving ? (Math.sin(t * 12) > 0 ? 1 : 0) : 0;
   const lean = pose === 'attack' ? 2 : 0;
   if (kind === 'elephant') {
-    const bob = moving ? (Math.sin(t * 8) > 0 ? 1 : 0) : 0;
-    pxc(g, x - 7, y - 9 + bob, 14, 8, '#8f8f96');
-    pxc(g, x - 7, y - 9 + bob, 14, 2, '#a5a5ac');
-    pxc(g, x + 4 + lean, y - 12 + bob, 6, 6, '#9a9aa2');
-    pxc(g, x + 3 + lean, y - 7 + bob, 2, 4, '#8f8f96');
-    pxc(g, x + 3 + lean, y - 3 + bob, 1, 2, '#8f8f96');
-    pxc(g, x + 5 + lean, y - 7 + bob, 1, 2, '#f0ead8');
-    pxc(g, x - 6, y - 13 + bob, 8, 4, '#6b4a2a');
-    pxc(g, x - 4, y - 16 + bob, 3, 3, cSkin);
-    pxc(g, x - 5, y - 18 + bob, 5, 2, cMain);
-    pxc(g, x - 6, y - 1, 2, 2, '#6a6a72');
-    pxc(g, x + 4, y - 1, 2, 2, '#6a6a72');
-    pxc(g, x - 3, y + (step ? -1 : 0), 2, 2, '#6a6a72');
-    pxc(g, x + 1, y + (step ? 0 : -1), 2, 2, '#6a6a72');
+    const eb = moving ? (Math.sin(t * 6) > 0 ? 1 : 0) : 0;
+    pxc(g, x - 9, y - 1, 18, 2, 'rgba(0,0,0,.28)');
+    pxc(g, x - 8, y - 13 + eb, 16, 9, ink);
+    pxc(g, x - 7, y - 12 + eb, 14, 7, '#8f8f96');
+    pxc(g, x - 7, y - 12 + eb, 14, 2, '#a5a5ac');
+    pxc(g, x - 7, y - 7 + eb, 14, 1, '#7a7a82');
+    pxc(g, x + 5 + lean, y - 16 + eb, 7, 7, ink);
+    pxc(g, x + 6 + lean, y - 15 + eb, 5, 5, '#9a9aa2');
+    pxc(g, x + 9 + lean, y - 12 + eb, 2, 5, '#8f8f96');
+    pxc(g, x + 10 + lean, y - 7 + eb, 1, 3, '#8f8f96');
+    pxc(g, x + 10 + lean, y - 13 + eb, 1, 1, '#e04a3a');
+    pxc(g, x + 9 + lean, y - 17 + eb, 2, 2, '#f0ead8');
+    pxc(g, x - 6, y - 19 + eb, 9, 6, ink);
+    pxc(g, x - 5, y - 18 + eb, 7, 4, '#6b4a2a');
+    pxc(g, x - 5, y - 18 + eb, 7, 1, '#7d5834');
+    pxc(g, x - 3, y - 23 + eb, 4, 5, cMain);
+    pxc(g, x - 3, y - 23 + eb, 1, 5, cLite);
+    pxc(g, x - 2, y - 25 + eb, 3, 3, cSkin);
+    pxc(g, x - 3, y - 26 + eb, 5, 2, metalD);
+    pxc(g, x - 6, y - 4, 3, 4, '#6a6a72');
+    pxc(g, x + 3, y - 4, 3, 4, '#6a6a72');
+    pxc(g, x - 2, y - 4 + (eb ? 0 : -1), 3, 4, '#6a6a72');
+    pxc(g, x, y - 4 + (eb ? -1 : 0), 3, 4, '#6a6a72');
     return;
   }
   if (kind === 'cav') {
-    pxc(g, x - 5, y - 5, 10, 5, '#6b4a2a');
-    pxc(g, x + 4 + lean, y - 7, 3, 3, '#6b4a2a');
-    pxc(g, x - 5, y - 6, 9, 2, '#7d5834');
-    pxc(g, x - 4, y + (step ? 0 : -1), 1, 3, '#5a3a1e');
-    pxc(g, x + 2, y + (step ? -1 : 0), 1, 3, '#5a3a1e');
-    pxc(g, x - 3 + lean, y - 10, 3, 3, cSkin);
-    pxc(g, x - 4 + lean, y - 12, 5, 3, cMain);
-    if (pose === 'attack') pxc(g, x + 2 + lean, y - 10, 4, 1, '#c8c8c8');
-    else pxc(g, x + 1 + lean, y - 10, 4, 1, '#8a6a3a');
+    pxc(g, x - 8, y - 1, 15, 2, 'rgba(0,0,0,.28)');
+    pxc(g, x - 6, y - 11, 13, 7, ink);
+    pxc(g, x - 5, y - 10, 11, 5, '#6b4a2a');
+    pxc(g, x - 5, y - 10, 11, 1, '#7d5834');
+    pxc(g, x - 7, y - 9, 2, 4, '#5a3a1e');
+    pxc(g, x - 4, y - 5 + (step ? 0 : -1), 2, 5, '#4a3018');
+    pxc(g, x + 3, y - 5 + (step ? -1 : 0), 2, 5, '#4a3018');
+    pxc(g, x + 5, y - 15, 5, 6, ink);
+    pxc(g, x + 6, y - 14, 3, 4, '#6b4a2a');
+    pxc(g, x + 8, y - 13, 1, 1, ink);
+    pxc(g, x + 6, y - 16, 2, 2, '#4a3018');
+    pxc(g, x + 4, y - 15, 1, 5, '#3a2a14');
+    pxc(g, x - 2, y - 12, 5, 2, cDark);
+    pxc(g, x - 3 + lean, y - 19, 6, 8, ink);
+    pxc(g, x - 2 + lean, y - 18, 4, 6, cMain);
+    pxc(g, x - 2 + lean, y - 18, 1, 6, cLite);
+    pxc(g, x - 2 + lean, y - 13, 4, 1, '#ffd24a');
+    pxc(g, x - 1 + lean, y - 22, 4, 4, cSkin);
+    pxc(g, x - 2 + lean, y - 24, 5, 2, metalD);
+    pxc(g, x - 1 + lean, y - 26, 2, 2, cMain);
+    pxc(g, x + 4 + lean, y - 23, 1, 3, metalL);
+    pxc(g, x + 4 + lean, y - 20, 1, 12, '#8a6a3a');
     return;
   }
-  pxc(g, x - 2 + lean, y - 6 + (step ? 0 : -1), 4, 5, cMain);
-  pxc(g, x - 2 + lean, y - 6 + (step ? 0 : -1), 4, 1, cDark);
-  pxc(g, x - 1 + lean, y - 9, 3, 3, cSkin);
-  pxc(g, x - 2 + lean, y - 11, 5, 2, team === 'player' ? '#8a8a8a' : '#5a3a1e');
-  pxc(g, x - 1 + (lean ? 1 : 0), y - 1 + (step ? -1 : 0), 1, 2, cDark);
-  pxc(g, x + 1 + (lean ? 1 : 0), y - 1 + (step ? 0 : -1), 1, 2, cDark);
+  pxc(g, x - 5, y - 1, 10, 2, 'rgba(0,0,0,.28)');
+  pxc(g, x - 2, y - 5 + (step ? 0 : -1), 2, 4, '#2a2018');
+  pxc(g, x + 1, y - 5 + (step ? -1 : 0), 2, 4, '#2a2018');
+  pxc(g, x - 3 + lean, y - 13 + (step ? 0 : -1), 7, 9, ink);
+  pxc(g, x - 2 + lean, y - 12 + (step ? 0 : -1), 5, 7, cMain);
+  pxc(g, x - 2 + lean, y - 12 + (step ? 0 : -1), 1, 7, cLite);
+  pxc(g, x - 2 + lean, y - 7 + (step ? 0 : -1), 5, 1, cDark);
+  pxc(g, x - 2 + lean, y - 9 + (step ? 0 : -1), 5, 1, '#3a2a1a');
+  pxc(g, x - 1 + lean, y - 9 + (step ? 0 : -1), 1, 1, '#ffd24a');
+  pxc(g, x - 3 + lean, y - 13 + (step ? 0 : -1), 2, 2, metal);
+  pxc(g, x + 2 + lean, y - 13 + (step ? 0 : -1), 2, 2, metal);
+  pxc(g, x - 2 + lean, y - 18 + (step ? 0 : -1), 6, 6, ink);
+  pxc(g, x - 1 + lean, y - 17 + (step ? 0 : -1), 4, 4, cSkin);
+  pxc(g, x - 1 + lean, y - 14 + (step ? 0 : -1), 4, 1, cSkinD);
+  pxc(g, x + 2 + lean, y - 16 + (step ? 0 : -1), 1, 1, ink);
+  pxc(g, x - 2 + lean, y - 19 + (step ? 0 : -1), 6, 3, metalD);
+  pxc(g, x - 1 + lean, y - 18 + (step ? 0 : -1), 4, 1, metal);
+  pxc(g, x - 1 + lean, y - 21 + (step ? 0 : -1), 2, 2, cMain);
   if (kind === 'spear') {
-    pxc(g, x + 4 + lean, y - 14, 1, 14, '#8a6a3a');
-    pxc(g, x + 3 + lean, y - 16, 3, 3, '#c8c8c8');
+    pxc(g, x + 4 + lean, y - 21, 1, 21, ink);
+    pxc(g, x + 4 + lean, y - 20, 1, 19, '#8a6a3a');
+    pxc(g, x + 3 + lean, y - 24, 3, 4, ink);
+    pxc(g, x + 4 + lean, y - 23, 1, 3, metalL);
+    pxc(g, x + 5 + lean, y - 23, 1, 2, metal);
   } else if (kind === 'shield') {
-    pxc(g, x + 2 + lean, y - 9, 3, 9, '#9aa4b0');
-    pxc(g, x + 3 + lean, y - 8, 1, 7, '#c8d0da');
-    pxc(g, x + 4 + lean, y - 7, 2, 1, '#c8c8c8');
+    pxc(g, x + 3 + lean, y - 14, 5, 12, ink);
+    pxc(g, x + 4 + lean, y - 13, 3, 10, '#8a94a2');
+    pxc(g, x + 4 + lean, y - 13, 1, 10, '#c8d0da');
+    pxc(g, x + 5 + lean, y - 9, 1, 2, '#ffd24a');
+    pxc(g, x + 5 + lean, y - 12, 1, 1, '#ffd24a');
   } else if (kind === 'archer') {
-    pxc(g, x + 4 + lean, y - 10, 1, 8, '#8a6a3a');
-    pxc(g, x + 3 + lean, y - 11, 3, 1, '#8a6a3a');
-    pxc(g, x + 3 + lean, y - 4, 3, 1, '#8a6a3a');
+    pxc(g, x - 4 + lean, y - 12 + (step ? 0 : -1), 2, 5, '#6b4a2a');
+    pxc(g, x - 4 + lean, y - 13 + (step ? 0 : -1), 2, 1, metalD);
+    pxc(g, x + 4 + lean, y - 15, 1, 13, ink);
+    pxc(g, x + 4 + lean, y - 14, 1, 11, '#8a6a3a');
+    pxc(g, x + 3 + lean, y - 14, 1, 2, '#8a6a3a');
+    pxc(g, x + 3 + lean, y - 4, 1, 2, '#8a6a3a');
+    pxc(g, x + 5 + lean, y - 13, 1, 10, '#d8d0c0');
   } else if (kind === 'crossbow') {
-    pxc(g, x + 2 + lean, y - 7, 5, 2, '#6b4a2a');
-    pxc(g, x + 3 + lean, y - 9, 3, 1, '#8a8a8a');
-    pxc(g, x + 1 + lean, y - 8, 1, 3, '#8a6a3a');
+    pxc(g, x + 2 + lean, y - 10, 7, 3, ink);
+    pxc(g, x + 2 + lean, y - 9, 7, 1, '#6b4a2a');
+    pxc(g, x + 4 + lean, y - 12, 2, 2, metal);
+    pxc(g, x + 5 + lean, y - 12, 1, 1, metalL);
+    pxc(g, x + 1 + lean, y - 11, 1, 4, '#8a6a3a');
+  } else {
+    pxc(g, x + 4 + lean, y - 15, 1, 15, '#8a6a3a');
   }
 }
 
 function drawHeroSprite(g, x, y, key, t, pose) {
+  if (drawArtSprite(g, 'heroes', key, x, y, 20, 26, null)) return;
   const H = HEROES[key];
   const lean = pose === 'attack' ? 2 : 0;
   const step = Math.sin(t * 10) > 0 ? 1 : 0;
-  pxc(g, x - 4 + (step ? -1 : 0), y - 8, 2, 9, H.cape);
-  pxc(g, x - 2 + lean, y - 6 + (step ? 0 : -1), 4, 6, '#8a6a3a');
-  pxc(g, x - 2 + lean, y - 6 + (step ? 0 : -1), 4, 1, '#ffd24a');
-  pxc(g, x - 1 + lean, y - 9, 3, 3, '#e8b88a');
-  pxc(g, x - 2 + lean, y - 11, 5, 2, H.cape);
-  pxc(g, x + lean, y - 13, 1, 2, '#ffd24a');
+  const oy = step ? 0 : -1;
+  const metal = '#c8d0da', metalD = '#8a94a2', metalL = '#f0f4f8';
+  const ink = '#1a120a';
+  pxc(g, x - 6, y - 1, 12, 2, 'rgba(0,0,0,.3)');
+  pxc(g, x - 6 + (step ? -1 : 0), y - 15 + oy, 4, 14, ink);
+  pxc(g, x - 5 + (step ? -1 : 0), y - 14 + oy, 3, 12, H.cape);
+  pxc(g, x - 2, y - 6 + (step ? 0 : -1), 2, 5, '#2a2018');
+  pxc(g, x + 1, y - 6 + (step ? -1 : 0), 2, 5, '#2a2018');
+  pxc(g, x - 3 + lean, y - 16 + oy, 7, 11, ink);
+  pxc(g, x - 2 + lean, y - 15 + oy, 5, 9, '#8a6a3a');
+  pxc(g, x - 2 + lean, y - 15 + oy, 1, 9, '#b08a4a');
+  pxc(g, x + 1 + lean, y - 15 + oy, 2, 9, '#6a4a28');
+  pxc(g, x - 2 + lean, y - 11 + oy, 5, 1, '#ffd24a');
+  pxc(g, x - 1 + lean, y - 11 + oy, 1, 1, '#e04a3a');
+  pxc(g, x - 3 + lean, y - 16 + oy, 2, 3, metal);
+  pxc(g, x + 2 + lean, y - 16 + oy, 2, 3, metal);
+  pxc(g, x - 2 + lean, y - 22 + oy, 6, 7, ink);
+  pxc(g, x - 1 + lean, y - 21 + oy, 4, 5, '#e8b88a');
+  pxc(g, x - 1 + lean, y - 17 + oy, 4, 1, '#c99566');
+  pxc(g, x + 2 + lean, y - 19 + oy, 1, 1, ink);
+  pxc(g, x - 2 + lean, y - 24 + oy, 6, 3, H.cape);
+  pxc(g, x - 1 + lean, y - 23 + oy, 4, 1, '#ffffff55');
+  pxc(g, x, y - 26 + oy, 2, 2, '#ffd24a');
   if (key === 'guanyu') {
-    pxc(g, x + 4 + lean, y - 16, 1, 16, '#7d5834');
-    pxc(g, x + 3 + lean, y - 18, 3, 3, '#e8e8f0');
+    pxc(g, x + 5 + lean, y - 26, 1, 26, ink);
+    pxc(g, x + 5 + lean, y - 25, 1, 24, '#7d5834');
+    pxc(g, x + 4 + lean, y - 31, 3, 6, ink);
+    pxc(g, x + 5 + lean, y - 30, 1, 5, metalL);
+    pxc(g, x + 6 + lean, y - 30, 1, 4, metal);
+    pxc(g, x + 4 + lean, y - 26, 3, 1, '#e04a3a');
   } else if (key === 'zhangfei') {
-    pxc(g, x + 4 + lean, y - 15, 1, 15, '#4a3220');
-    pxc(g, x + 3 + lean, y - 17, 3, 2, '#9aa4b0');
+    pxc(g, x + 5 + lean, y - 24, 1, 24, ink);
+    pxc(g, x + 5 + lean, y - 23, 1, 22, '#4a3220');
+    pxc(g, x + 4 + lean, y - 28, 3, 5, ink);
+    pxc(g, x + 5 + lean, y - 27, 1, 4, metal);
+    pxc(g, x + 3 + lean, y - 26, 1, 1, metalD);
+    pxc(g, x + 7 + lean, y - 26, 1, 1, metalD);
   } else if (key === 'zhaoyun') {
-    pxc(g, x + 4 + lean, y - 14, 1, 14, '#8a6a3a');
-    pxc(g, x + 3 + lean, y - 16, 3, 3, '#ffd24a');
+    pxc(g, x + 5 + lean, y - 25, 1, 25, ink);
+    pxc(g, x + 5 + lean, y - 24, 1, 23, '#8a94a2');
+    pxc(g, x + 4 + lean, y - 29, 3, 5, ink);
+    pxc(g, x + 5 + lean, y - 28, 1, 4, metalL);
+    pxc(g, x + 5 + lean, y - 31, 1, 3, '#ffffff');
   } else if (key === 'huangzhong') {
-    pxc(g, x + 4 + lean, y - 11, 1, 9, '#8a6a3a');
-    pxc(g, x + 3 + lean, y - 12, 3, 1, '#8a6a3a');
-    pxc(g, x + 3 + lean, y - 4, 3, 1, '#8a6a3a');
+    pxc(g, x + 5 + lean, y - 18, 1, 16, ink);
+    pxc(g, x + 5 + lean, y - 17, 1, 14, '#8a6a3a');
+    pxc(g, x + 4 + lean, y - 17, 1, 3, '#8a6a3a');
+    pxc(g, x + 4 + lean, y - 5, 1, 3, '#8a6a3a');
+    pxc(g, x + 6 + lean, y - 16, 1, 12, '#d8d0c0');
+    pxc(g, x - 5 + lean, y - 14 + oy, 2, 6, '#6b4a2a');
   } else {
-    pxc(g, x + 4 + lean, y - 17, 1, 17, '#8a6a3a');
-    pxc(g, x + 2 + lean, y - 15, 5, 1, '#d8d8e0');
-    pxc(g, x + 3 + lean, y - 19, 3, 3, '#d8d8e0');
+    pxc(g, x + 6 + lean, y - 27, 1, 27, ink);
+    pxc(g, x + 6 + lean, y - 26, 1, 25, '#8a6a3a');
+    pxc(g, x + 4 + lean, y - 30, 5, 2, ink);
+    pxc(g, x + 5 + lean, y - 30, 3, 1, metalL);
+    pxc(g, x + 4 + lean, y - 32, 3, 3, ink);
+    pxc(g, x + 5 + lean, y - 31, 1, 2, metalL);
+    pxc(g, x + 7 + lean, y - 29, 1, 2, metal);
   }
 }
 
