@@ -98,6 +98,21 @@
   .hpbar { background: #241505; border: 1px solid #6e4c2c; height: 10px; margin: 4px 0; }
   .hpbar div { height: 100%; }
 
+  #cityCanvas {
+    width: 100%;
+    image-rendering: pixelated;
+    background: #241505;
+    border: 2px solid var(--panel-light);
+    box-shadow: 0 3px 0 #150c04;
+    display: block;
+    margin-bottom: 8px;
+    touch-action: none;
+    cursor: grab;
+  }
+  #cityCanvas:active { cursor: grabbing; }
+  #cityInfo { min-height: 34px; }
+  #cityInfo .build-row { margin-bottom: 0; }
+  .cityhint { display: block; text-align: center; color: #d9b98a; font-size: 11px; margin-top: 8px; }
   .overlay {
     position: fixed; inset: 0;
     background: rgba(8, 5, 2, .78);
@@ -264,7 +279,9 @@
 <div class="overlay" id="cityOverlay">
   <div class="panelbox">
     <h2>🏛️ THÀNH PHỐ</h2>
-    <div id="buildList"></div>
+    <canvas id="cityCanvas" width="480" height="300"></canvas>
+    <div id="cityInfo" class="cityinfo"></div>
+    <small class="cityhint">✋ Giủ &amp; kéo công trình để sắp xếp · bấm vào công trình để nâng cấp</small>
     <button class="closebtn" data-close="cityOverlay">ĐÓNG</button>
   </div>
 </div>
@@ -591,6 +608,7 @@ if (!state.pvp || typeof state.pvp.rating !== 'number') {
   state.pvp = { nick: 'Lãnh Chúa' + (100 + Math.floor(Math.random() * 900)), rating: 1000, wins: 0, losses: 0, cd: 0, board: null };
 }
 if (!Array.isArray(state.pvp.board) || !state.pvp.board.length) state.pvp.board = genBoard();
+if (!state.cityLayout || typeof state.cityLayout !== 'object') state.cityLayout = defaultCityLayout();
 function save() {
   try { localStorage.setItem(SAVE_KEY, JSON.stringify(state)); } catch (e) {}
 }
@@ -1655,6 +1673,7 @@ $('btnHelp').onclick = () => {
   setTimeout(() => toast('🚨 Quân cướp cũng HÀNH QUÂN ra đánh — trấn giữ ô hoặc về doanh phòng thủ!'), 3000);
   setTimeout(() => toast('🌐 ĐẤU TRƯỜNG: vào sảnh chờ ghép trận PVP, leo bảng Danh Vọng!'), 4000);
   setTimeout(() => toast('🏗️ Ô đất đã chiếm: bấm vào ô để xây Nông Trại / Xưởng Gỗ / Mỏ Đá / Điểm Tập Kết!'), 5000);
+  setTimeout(() => toast('⌂ THÀNH PHỐ: bấm vào thành để vào giao diện thành — giủ & kéo để sắp xếp công trình!'), 6000);
 };
 addEventListener('keydown', e => {
   if (e.key === 'Escape') {
@@ -1765,29 +1784,212 @@ function recruit(k, n) {
   renderArmy(); updateHUD(); save();
 }
 
-function renderCity() {
-  const box = $('buildList');
-  box.innerHTML = '';
-  Object.entries(BUILDINGS).forEach(([k, B]) => {
-    const lvl = bLevel(k);
-    const maxed = lvl >= B.max;
-    const gated = k !== 'capital' && lvl >= bLevel('capital');
-    const cost = maxed ? null : B.cost(lvl);
-    let afford = true;
-    if (cost) for (const rk in cost) if (state.res[rk] < cost[rk]) afford = false;
-    const row = document.createElement('div');
-    row.className = 'build-row';
-    row.innerHTML = `
-      <canvas class="bicon" width="30" height="30" data-k="${k}" data-lvl="${lvl}"></canvas>
-      <span class="info"><b>${B.name} <span class="lvl-badge">Lv ${lvl}/${B.max}</span></b>
-      <small>${B.desc(Math.max(1, lvl))}</small></span>
-      <button class="actbtn" ${maxed || gated || !afford ? 'disabled' : ''}>
-        ${maxed ? '✔ Tối đa' : gated ? '🔒 Nâng Chủ Thành' : '⬆️ ' + costStr(cost)}</button>`;
-    row.querySelector('button').onclick = () => upgradeBuilding(k);
-    box.appendChild(row);
-  });
-  box.querySelectorAll('canvas.bicon').forEach(cv => drawBuildingIcon(cv.getContext('2d'), cv.dataset.k, parseInt(cv.dataset.lvl), 30));
+/* ================= GIAO DIỆN THÀNH PHỐ (kéo-thả sắp xếp) ================= */
+const CITY_COLS = 6, CITY_ROWS = 4, CITY_CELL_W = 80, CITY_CELL_H = 66, CITY_OY = 36;
+const CITY_ORDER = Object.keys(BUILDINGS);
+
+function defaultCityLayout() {
+  return {
+    capital: { cx: 2, cy: 1 },
+    barn: { cx: 0, cy: 0 },
+    warehouse: { cx: 1, cy: 0 },
+    barracks: { cx: 3, cy: 0 },
+    range: { cx: 4, cy: 0 },
+    stable: { cx: 0, cy: 1 },
+    watchtower: { cx: 5, cy: 1 },
+  };
 }
+function normalizeCityLayout() {
+  if (!state.cityLayout || typeof state.cityLayout !== 'object') state.cityLayout = defaultCityLayout();
+  const used = {};
+  CITY_ORDER.forEach(k => {
+    const p = state.cityLayout[k];
+    if (p && Number.isInteger(p.cx) && Number.isInteger(p.cy) &&
+        p.cx >= 0 && p.cx < CITY_COLS && p.cy >= 0 && p.cy < CITY_ROWS &&
+        !used[p.cx + ',' + p.cy]) used[p.cx + ',' + p.cy] = k;
+    else state.cityLayout[k] = null;
+  });
+  let i = 0;
+  CITY_ORDER.forEach(k => {
+    if (state.cityLayout[k]) return;
+    while (used[(i % CITY_COLS) + ',' + Math.floor(i / CITY_COLS)]) i++;
+    state.cityLayout[k] = { cx: i % CITY_COLS, cy: Math.floor(i / CITY_COLS) };
+    used[state.cityLayout[k].cx + ',' + state.cityLayout[k].cy] = k;
+    i++;
+  });
+}
+
+let citySel = null;
+let cityDrag = null;
+
+function cityCellAt(px, py) {
+  const cx = Math.floor(px / CITY_CELL_W);
+  const cy = Math.floor((py - CITY_OY) / CITY_CELL_H);
+  if (cx < 0 || cx >= CITY_COLS || cy < 0 || cy >= CITY_ROWS) return null;
+  return { cx, cy };
+}
+function cityBuildingAt(cx, cy) {
+  for (const k of CITY_ORDER) {
+    const p = state.cityLayout[k];
+    if (p && p.cx === cx && p.cy === cy) return k;
+  }
+  return null;
+}
+function cityCellCenter(p) {
+  return { x: p.cx * CITY_CELL_W + CITY_CELL_W / 2, y: CITY_OY + p.cy * CITY_CELL_H + CITY_CELL_H / 2 };
+}
+function drawCityBldAt(g, k, x, y, alpha) {
+  g.save();
+  if (alpha != null) g.globalAlpha = alpha;
+  g.translate(Math.round(x - 30), Math.round(y - 34));
+  drawBuildingIcon(g, k, bLevel(k), 60);
+  g.restore();
+}
+function drawCity() {
+  const cv = $('cityCanvas');
+  if (!cv || !cv.getContext) return;
+  const g = cv.getContext('2d');
+  const W = cv.width || 480, H = cv.height || 300;
+  g.imageSmoothingEnabled = false;
+  g.fillStyle = '#2a3140'; g.fillRect(0, 0, W, CITY_OY);
+  g.fillStyle = '#6e6257'; g.fillRect(0, 10, W, CITY_OY - 10);
+  g.fillStyle = '#8a7c6d';
+  for (let x = 2; x < W; x += 16) g.fillRect(x, 4, 10, 8);
+  g.fillStyle = '#4d4038'; g.fillRect(0, CITY_OY - 6, W, 6);
+  g.fillStyle = '#241505'; g.fillRect(W / 2 - 24, CITY_OY - 28, 48, 28);
+  g.fillStyle = '#5a3a1a'; g.fillRect(W / 2 - 19, CITY_OY - 23, 38, 23);
+  g.fillStyle = '#a8821e'; g.fillRect(W / 2 - 22, CITY_OY - 26, 44, 3);
+  g.fillStyle = '#3d5a2a'; g.fillRect(0, CITY_OY, W, H - CITY_OY);
+  for (let cy = 0; cy < CITY_ROWS; cy++) for (let cx = 0; cx < CITY_COLS; cx++) {
+    g.fillStyle = (cx + cy) % 2 ? '#41612d' : '#3d5a2a';
+    g.fillRect(cx * CITY_CELL_W, CITY_OY + cy * CITY_CELL_H, CITY_CELL_W, CITY_CELL_H);
+  }
+  g.strokeStyle = 'rgba(20,12,4,.55)'; g.lineWidth = 1;
+  for (let cx = 0; cx <= CITY_COLS; cx++) { g.beginPath(); g.moveTo(cx * CITY_CELL_W + .5, CITY_OY); g.lineTo(cx * CITY_CELL_W + .5, H); g.stroke(); }
+  for (let cy = 0; cy <= CITY_ROWS; cy++) { g.beginPath(); g.moveTo(0, CITY_OY + cy * CITY_CELL_H + .5); g.lineTo(W, CITY_OY + cy * CITY_CELL_H + .5); g.stroke(); }
+  if (citySel && !cityDrag) {
+    const p = state.cityLayout[citySel];
+    if (p) {
+      g.strokeStyle = '#ffd75e'; g.lineWidth = 3;
+      g.strokeRect(p.cx * CITY_CELL_W + 2, CITY_OY + p.cy * CITY_CELL_H + 2, CITY_CELL_W - 4, CITY_CELL_H - 4);
+    }
+  }
+  g.font = 'bold 9px monospace'; g.textAlign = 'center';
+  CITY_ORDER.forEach(k => {
+    const p = state.cityLayout[k];
+    if (!p || (cityDrag && cityDrag.moved && cityDrag.key === k)) return;
+    const c = cityCellCenter(p);
+    drawCityBldAt(g, k, c.x, c.y);
+    g.fillStyle = '#ffe9b0';
+    g.fillText('Lv ' + bLevel(k), Math.round(c.x), Math.round(c.y + 26));
+  });
+  if (cityDrag && cityDrag.moved) {
+    const p = state.cityLayout[cityDrag.key];
+    if (p) {
+      const c = cityCellCenter(p);
+      g.fillStyle = 'rgba(0,0,0,.4)';
+      g.fillRect(c.x - 32, c.y - 36, 64, 64);
+      const cell = cityCellAt(cityDrag.x, cityDrag.y);
+      if (cell) {
+        g.strokeStyle = '#ffd75e'; g.lineWidth = 2;
+        g.strokeRect(cell.cx * CITY_CELL_W + 2, CITY_OY + cell.cy * CITY_CELL_H + 2, CITY_CELL_W - 4, CITY_CELL_H - 4);
+      }
+      drawCityBldAt(g, cityDrag.key, cityDrag.x, cityDrag.y, .8);
+    }
+  }
+}
+function renderCityInfo() {
+  const box = $('cityInfo');
+  if (!box) return;
+  box.innerHTML = '';
+  if (!citySel) {
+    const sm = document.createElement('small');
+    sm.textContent = 'Bấm vào công trình để xem & nâng cấp · giủ và kéo để sắp xếp lại vị trí.';
+    box.appendChild(sm);
+    return;
+  }
+  const B = BUILDINGS[citySel];
+  const lvl = bLevel(citySel);
+  const maxed = lvl >= B.max;
+  const gated = citySel !== 'capital' && lvl >= bLevel('capital');
+  const cost = maxed ? null : B.cost(lvl);
+  let afford = true;
+  if (cost) for (const rk in cost) if (state.res[rk] < cost[rk]) afford = false;
+  const row = document.createElement('div');
+  row.className = 'build-row';
+  row.innerHTML = `
+    <canvas class="bicon" width="30" height="30"></canvas>
+    <span class="info"><b>${B.name} <span class="lvl-badge">Lv ${lvl}/${B.max}</span></b>
+    <small>${B.desc(Math.max(1, lvl))}</small></span>
+    <button class="actbtn" ${maxed || gated || !afford ? 'disabled' : ''}>
+      ${maxed ? '\u2714 Tối đa' : gated ? '\u23eb Nâng Chủ Thành' : '\u25b2 ' + costStr(cost)}</button>`;
+  row.querySelector('button').onclick = () => upgradeBuilding(citySel);
+  box.appendChild(row);
+  drawBuildingIcon(row.querySelector('canvas.bicon').getContext('2d'), citySel, lvl, 30);
+}
+function cityDropAt(key, px, py) {
+  const cell = cityCellAt(px, py);
+  if (!cell) return null;
+  const from = state.cityLayout[key];
+  if (!from) return null;
+  const occ = cityBuildingAt(cell.cx, cell.cy);
+  if (occ && occ !== key) {
+    state.cityLayout[occ] = { cx: from.cx, cy: from.cy };
+    state.cityLayout[key] = { cx: cell.cx, cy: cell.cy };
+    return 'swap';
+  }
+  state.cityLayout[key] = { cx: cell.cx, cy: cell.cy };
+  return 'move';
+}
+function renderCity() {
+  normalizeCityLayout();
+  drawCity();
+  renderCityInfo();
+}
+(function bindCityCanvas() {
+  const cv = $('cityCanvas');
+  if (!cv || !cv.addEventListener) return;
+  function pos(e) {
+    const r = cv.getBoundingClientRect();
+    return { x: (e.clientX - r.left) * (cv.width / r.width), y: (e.clientY - r.top) * (cv.height / r.height) };
+  }
+  cv.addEventListener('pointerdown', e => {
+    const p = pos(e);
+    const cell = cityCellAt(p.x, p.y);
+    const k = cell ? cityBuildingAt(cell.cx, cell.cy) : null;
+    if (!k) { citySel = null; renderCityInfo(); drawCity(); return; }
+    cityDrag = { key: k, sx: p.x, sy: p.y, x: p.x, y: p.y, moved: false };
+    try { cv.setPointerCapture(e.pointerId); } catch (err) {}
+    e.preventDefault();
+  });
+  cv.addEventListener('pointermove', e => {
+    if (!cityDrag) return;
+    const p = pos(e);
+    cityDrag.x = p.x; cityDrag.y = p.y;
+    if (!cityDrag.moved && (Math.abs(p.x - cityDrag.sx) > 6 || Math.abs(p.y - cityDrag.sy) > 6)) cityDrag.moved = true;
+    if (cityDrag.moved) drawCity();
+  });
+  cv.addEventListener('pointerup', e => {
+    if (!cityDrag) return;
+    const d = cityDrag; cityDrag = null;
+    if (d.moved) {
+      const prev = state.cityLayout[d.key] ? { cx: state.cityLayout[d.key].cx, cy: state.cityLayout[d.key].cy } : null;
+      const cell = cityCellAt(d.x, d.y);
+      const occ = cell ? cityBuildingAt(cell.cx, cell.cy) : null;
+      const res = cityDropAt(d.key, d.x, d.y);
+      if (res === 'swap' && occ) toast('\u21c4 Ho\u00e1n \u0111\u1ed5i v\u1ecb tr\u00ed ' + BUILDINGS[d.key].name + ' \u2194 ' + BUILDINGS[occ].name);
+      else if (res === 'move' && prev && (prev.cx !== state.cityLayout[d.key].cx || prev.cy !== state.cityLayout[d.key].cy))
+        toast('\u25a6 \u0110\u00e3 chuy\u1ec3n ' + BUILDINGS[d.key].name + ' sang \u00f4 m\u1edbi');
+      if (res) { citySel = d.key; save(); }
+      renderCity();
+    } else {
+      citySel = d.key;
+      renderCityInfo();
+      drawCity();
+    }
+  });
+  cv.addEventListener('pointercancel', () => { if (cityDrag) { cityDrag = null; drawCity(); } });
+})();
 
 function renderArmy() {
   const box = $('unitList');

@@ -91,6 +91,17 @@ Bấm vào ô 🏰 Chủ Thành: ngoài máu thành, phòng thủ, quân đồn 
 
 **Icon công trình pixel thay đổi theo cấp**: cấp 2 mọc cờ vàng, cấp 3 móng đá, cấp 4 tháp bên, cấp 5 viền mái vàng. Bản đồ chủ thành cũng lớn dần theo cấp Chủ Thành (tháp đôi → tường đá → mái vàng → cờ vàng).
 
+## 🏙️ Giao diện Thành Phố — sắp xếp công trình (mới)
+
+Bấm vào ô 🏰 thành trên bản đồ (hoặc nút 🏛️ **THÀNH PHỐ**, phím `C`) để **chuyển hẳn sang giao diện thành phố** — màn hình riêng chỉ hiển thị về thành: tường thành, cổng và sân trong chứa các công trình.
+
+- **Giữ & kéo** một công trình để di chuyển vị trí — có bóng mờ theo chuột/touch và ô đích sáng vàng
+- Thả lên ô trống → công trình chuyển sang ô đó; thả lên ô có công trình khác → **hoán đổi vị trí** cho nhau
+- **Bấm** (không kéo) vào công trình để xem chi tiết + nút nâng cấp ngay tại chỗ
+- Vị trí sắp xếp được **lưu tự động** vào save — lần sau mở lên vẫn như cũ
+
+Icon công trình vẫn thay đổi theo cấp (cờ vàng → móng đá → tháp bên → viền vàng) ngay trong giao diện thành.
+
 ## 🌐 Đấu Trường — Sảnh chờ ghép trận
 
 Mở 🌐 **ĐẤU TRƯỜNG** (phím `P`) để vào sảnh chờ ghép trận PVP:
